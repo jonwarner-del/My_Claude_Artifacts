@@ -97,13 +97,9 @@
   }
 
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;background:var(--ground);}
   body{
-    background:var(--ground);
-    background-image:
-      linear-gradient(var(--grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size: 28px 28px;
+    min-height:100vh;
     color:var(--ink);
     font-family:var(--font-sans);
     -webkit-font-smoothing:antialiased;
@@ -637,7 +633,7 @@
 <div class="sheet">
 
   <div class="titleblock">
-    <h1>Sparq Migration Timeline Estimator</h1>
+    <h1>Fabric Migration Timeline Estimator</h1>
     <p class="sub">Scope inputs → phased duration, in weeks</p>
   </div>
 
