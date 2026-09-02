@@ -1,0 +1,2291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{color-scheme:light}
+  body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#D9D1CE;color:#16110F}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<title>Snowflake Migration Timeline Estimator</title>
+<!-- The <html> element is supplied at publish time and carries no lang, so the
+     document language is set here instead: without it a screen reader reads the
+     whole page in whatever voice it defaults to. Runs at parse time, before any
+     content. A standalone copy with its own lang="en" makes this a no-op. -->
+<script>document.documentElement.lang = 'en';</script>
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<style>
+  :root{
+    color-scheme: light;
+
+    /* ---- Sparq brand — the original eight -------------------------- */
+    --brand-black:       #16110F;  /* near-black brown              */
+    --brand-espresso:    #231A17;  /* dark warm brown               */
+    --brand-pine:        #252D25;  /* green-black                   */
+    --brand-forest:      #3C4E3C;  /* deep green                    */
+    --brand-rust:        #732E1F;  /* deep rust                     */
+    --brand-terracotta:  #A23F2B;  /* terracotta                    */
+    --brand-stone:       #B8B0AD;  /* warm mid neutral              */
+    --brand-linen:       #D9D1CE;  /* warm light neutral            */
+
+    /* ---- Sparq brand — the remaining thirteen, read as ramps ------ */
+    /* ink: warm brown → warm grey */
+    --brand-bark:        #392E27;
+    --brand-umber:       #51453F;
+    --brand-taupe:       #71635C;
+    /* coral / terracotta */
+    --brand-coral:       #E75437;  /* the vivid signature           */
+    --brand-coral-mid:   #F0AB9D;
+    --brand-coral-pale:  #F9DDD8;
+    /* green */
+    --brand-sage:        #667E66;
+    --brand-sage-mid:    #ADC0AD;
+    --brand-sage-pale:   #D8DED8;
+    /* paper */
+    --brand-paper:       #EBE5E2;
+    --brand-paper-mid:   #F2ECEA;
+    --brand-paper-high:  #F9F7F5;
+    /* signal */
+    --brand-lime:        #B8F0A1;  /* the concurrent-work band       */
+
+    /* ---- roles: every one of these is an official brand value ---- */
+    --ground:         var(--brand-linen);       /* #D9D1CE */
+    --surface-raised: var(--brand-paper);       /* #EBE5E2 */
+    --surface:        var(--brand-paper-mid);   /* #F2ECEA */
+    --surface-input:  var(--brand-paper-high);  /* #F9F7F5 */
+    --surface-hover:  var(--brand-coral-pale);  /* #F9DDD8 */
+
+    --ink:        var(--brand-black);   /* body + headings, 16.0:1 on card  */
+    --ink-meta:   var(--brand-bark);    /* mono eyebrows + labels, 11.3:1   */
+    --ink-hint:   var(--brand-taupe);   /* hint text, 4.9:1                 */
+    --ink-quiet:  var(--brand-umber);   /* ticks, note, footer, 6.1–7.9:1   */
+    --ink-invert: var(--brand-paper-high); /* type on dark fills            */
+
+    /* Two coral roles, because a fill and an edge are held to different bars.
+       --accent is the FILL: #E75437 carrying --ink at 5.1:1, never inverted ink.
+       As a 1px edge it is a non-text contrast case needing 3:1, and measured it
+       does not reach it — 3.14:1 on --surface and 2.94:1 on --surface-raised —
+       so every border, ring and rail uses --accent-edge instead: #E34B30, which
+       measures 3.39:1 and 3.18:1 against those same two grounds. */
+    --accent:        var(--brand-coral);
+    --accent-edge:   #E34B30;
+    --accent-strong: var(--brand-rust);  /* the headline numeral, 8.4:1     */
+
+    --frame:       var(--brand-black);
+    --rule:        var(--brand-stone);
+    --rule-strong: var(--brand-taupe);
+    --grid:        var(--brand-stone);
+
+    /* ---- timeline phases (+ the ink that sits on each) ----------
+       The nine-phase sequence is unchanged from the Fabric sibling, and was
+       re-run through the data-viz palette validator against this card surface
+       (#F2ECEA). Both separation checks PASS: worst adjacent pair is
+       parallel↔validation at ΔE 21.9 protan/deutan and 22.1 normal vision
+       (targets ≥8 / ≥15). The validator's lightness-band and chroma-floor
+       checks FAIL by design — this is a brand-locked, deliberately desaturated
+       sequence, not a free-floating categorical set — and four fills sit under
+       3:1 against the surface, which the validator flags as needing relief.
+       The relief is real and always present: every band is direct-labelled,
+       repeated in the legend with its own figure, and carries a hover title,
+       so identity is never carried by colour alone.                       */
+    --phase-provision:     var(--brand-taupe);        /* #71635C — label 5.4:1  */
+    --phase-provision-ink: var(--ink-invert);
+    --phase-assess:        var(--brand-stone);        /* #B8B0AD — label 8.8:1  */
+    --phase-assess-ink:    var(--brand-black);
+    --phase-build:         var(--brand-forest);       /* #3C4E3C — label 8.4:1  */
+    --phase-build-ink:     var(--ink-invert);
+    --phase-pilot:         var(--brand-coral-mid);    /* #F0AB9D — label 9.8:1  */
+    --phase-pilot-ink:     var(--brand-black);
+    --phase-waves:         var(--brand-terracotta);   /* #A23F2B — label 6.0:1  */
+    --phase-waves-ink:     var(--ink-invert);
+    --phase-recon:         var(--brand-sage-mid);     /* #ADC0AD — label 9.7:1  */
+    --phase-recon-ink:     var(--brand-black);
+    /* The one band label under 4.5:1: --ink on this fill measures 4.23:1, and
+       it is the best any brand ink reaches here — re-measured, still true.
+       The large-text exemption was the other way out and was rejected: it
+       needs 18.66px bold, and a phase label is 10px because the bar drops any
+       label wider than its own band, so a label that size would be deleted on
+       every narrow parallel-run band and the direct label would be lost to buy
+       a ratio. So this stays disclosed rather than fixed, and the relief is
+       structural and always present: the band is direct-labelled, repeated in
+       the legend with its own weeks figure, and carries a hover title.      */
+    --phase-parallel:      var(--brand-sage);         /* #667E66 — label 4.23:1 */
+    --phase-parallel-ink:  var(--brand-black);
+    --phase-hyper:         var(--brand-espresso);     /* #231A17 — label 16.0:1 */
+    --phase-hyper-ink:     var(--ink-invert);
+    /* concurrent, not a segment in the stack — reads as another kind of thing */
+    --phase-enable:        var(--brand-lime);         /* #B8F0A1 — label 14.3:1 */
+    --phase-enable-ink:    var(--brand-black);
+
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ground);}
+  body{
+    min-height:100vh;
+    color:var(--ink);
+    font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;
+    padding: 20px 14px 60px;
+  }
+
+  .sheet{
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .titleblock{
+    border: 1.5px solid var(--frame);
+    padding: 18px 18px 14px;
+    margin-bottom: 18px;
+    background: var(--surface-raised);
+    position: relative;
+  }
+  .titleblock::before{
+    content:"MIGRATION SCOPE — REV. C";
+    position:absolute;
+    top:-11px; left:14px;
+    background:var(--surface-raised);
+    padding:0 8px;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:0.12em;
+    color:var(--ink-quiet);
+  }
+  h1{
+    font-family:var(--font-sans);
+    font-weight:600;
+    font-size: clamp(21px, 4.6vw, 29px);
+    margin: 6px 0 4px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .sub{
+    font-family:var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-meta);
+    margin: 0;
+  }
+
+  .card{
+    border: 1.5px solid var(--frame);
+    background: var(--surface);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card-label{
+    font-family:var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-meta);
+    margin: 0 0 14px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .card-label::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background: var(--rule-strong);
+  }
+
+  /* ---- sub-sections inside the scope card ---------------------- */
+  .group + .group{ margin-top: 22px; }
+  .group-label{
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-hint);
+    margin: 0 0 12px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .group-label::after{
+    content:"";
+    flex:1;
+    border-top:1px dashed var(--rule);
+  }
+
+  .field{ margin-bottom: 16px; }
+  .field:last-child{ margin-bottom: 0; }
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px 18px;
+    align-items: start;
+  }
+  .grid .field{ margin-bottom: 0; }
+  .stack{
+    display:flex;
+    flex-direction:column;
+    gap: 14px;
+  }
+  .stack .field{ margin-bottom: 0; }
+
+  label{
+    display:block;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: var(--ink);
+  }
+  .hint{
+    font-family:var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--ink-hint);
+    display:block;
+    margin-top: 5px;
+  }
+
+  input[type="number"], select{
+    width: 100%;
+    font-family:var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    padding: 9px 10px;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-input);
+    color: var(--ink);
+  }
+  select{
+    appearance:none;
+    -webkit-appearance:none;
+    padding-right: 28px;
+    border-radius: 0;
+  }
+  input[type="number"]:focus, select:focus{
+    outline: 2px solid var(--accent-edge);
+    outline-offset: 1px;
+  }
+  select:disabled, input[type="number"]:disabled{
+    color: var(--ink-hint);
+    background: var(--surface);
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+  .select-wrap{ position:relative; display:block; }
+  .select-wrap::after{
+    content:"";
+    position:absolute;
+    right: 11px;
+    top: 50%;
+    margin-top: -2px;
+    border-left: 4.5px solid transparent;
+    border-right: 4.5px solid transparent;
+    border-top: 5px solid var(--ink-meta);
+    pointer-events:none;
+  }
+
+  .segmented{
+    display:flex;
+    border: 1px solid var(--rule-strong);
+    overflow:hidden;
+  }
+  .segmented button{
+    flex:1;
+    font-family:var(--font-mono);
+    font-size: 12px;
+    padding: 9px 6px;
+    background: var(--surface-input);
+    border: none;
+    border-right: 1px solid var(--rule-strong);
+    color: var(--ink);
+    cursor:pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .segmented button:last-child{ border-right:none; }
+  .segmented button:hover{ background: var(--surface-hover); }
+  .segmented button.active{
+    background: var(--accent);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: inset 0 -3px 0 var(--frame);
+  }
+  .segmented button:focus-visible{
+    outline: 2px solid var(--frame);
+    outline-offset: -2px;
+  }
+
+  /* ---- toggles: the same square, hard-edged idiom as the segments -- */
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 12px;
+    border-top: 1px dashed var(--rule);
+    padding-top: 12px;
+  }
+  .toggle-row label{ margin:0; }
+  .toggle-copy{ min-width:0; }
+  .toggle-copy .hint{ margin-top: 3px; }
+  /* 40x24. The 24px height is the WCAG 2.2 target-size minimum, not a
+     styling choice: at the old 20px the switch was 4px short of it. The knob
+     keeps its 14px size and its 3px/23px travel, so only the vertical centring
+     moved — the switch reads the same and now hit-tests legally. The label
+     stays a second, larger target for the same control. */
+  .switch{
+    position:relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 24px;
+    display:block;
+  }
+  .switch input{
+    position:absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  /* The input is the hit target. The track and knob are LATER siblings painted
+     over it, so without this they win elementFromPoint at the switch centre and
+     every toggle is dead to the pointer while its label and the Space key still
+     work — which is exactly how that goes unnoticed. */
+  .switch .track, .switch .knob{ pointer-events: none; }
+  .switch .track{
+    position:absolute;
+    inset: 0;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-input);
+    transition: background 0.15s ease;
+  }
+  .switch .knob{
+    position:absolute;
+    top: 5px; left: 3px;
+    width: 14px; height: 14px;
+    background: var(--rule-strong);
+    transition: left 0.15s ease, background 0.15s ease;
+  }
+  .switch input:checked ~ .track{ background: var(--accent); }
+  .switch input:checked ~ .knob{ left: 23px; background: var(--frame); }
+  .switch input:focus-visible ~ .track{
+    outline: 2px solid var(--frame);
+    outline-offset: 2px;
+  }
+  .switch input:disabled{ cursor: not-allowed; }
+  .switch input:disabled ~ .track{ border-style: dashed; }
+  .switch input:disabled ~ .knob{ background: var(--ink-hint); }
+  .locknote{
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-hint);
+    display:block;
+    margin-top: 4px;
+  }
+  .locknote[hidden]{ display:none; }
+
+  /* Announced, never drawn. Not display:none — that would take it out of the
+     accessibility tree along with the layout. */
+  .sr-only{
+    position:absolute;
+    width:1px; height:1px;
+    margin:-1px; padding:0;
+    overflow:hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space:nowrap;
+    border:0;
+  }
+
+  /* The one place the coral is spent as a rail: the measured input that
+     demotes the source-platform label. It is the structural change this
+     revision exists for, so it is the one thing that gets to be loud. */
+  .readout{
+    font-family:var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.65;
+    color: var(--ink-quiet);
+    background: var(--surface-raised);
+    border: 1px dashed var(--rule-strong);
+    border-left: 3px solid var(--accent-edge);
+    padding: 9px 11px;
+    margin-top: 10px;
+  }
+  .readout b{
+    font-weight: 600;
+    color: var(--ink-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .subfield{
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--rule);
+  }
+
+  .result-headline{
+    text-align:center;
+    padding: 6px 0 18px;
+  }
+  .result-headline .range{
+    font-family:var(--font-sans);
+    font-weight:600;
+    font-size: clamp(34px, 10vw, 52px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--accent-strong);
+    line-height: 1;
+  }
+  .result-headline .unit{
+    font-family:var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform:uppercase;
+    color: var(--ink-quiet);
+    margin-top: 8px;
+  }
+
+  .ruler{
+    position: relative;
+    height: 20px;
+    margin: 0 0 2px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .ruler span{
+    position:absolute;
+    bottom: 4px;
+    transform: translateX(-50%);
+    font-family:var(--font-mono);
+    font-size: 9.5px;
+    white-space: nowrap;
+    color: var(--ink-quiet);
+  }
+  .ruler i{
+    position:absolute;
+    bottom: 0;
+    width:1px;
+    height: 6px;
+    background: var(--rule-strong);
+  }
+
+  .timeline{
+    display:flex;
+    width: 100%;
+    height: 46px;
+    border: 1px solid var(--frame);
+    background: var(--surface);
+    overflow:hidden;
+  }
+  .phase{
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    border-right: 2px solid var(--surface);
+    min-width: 2px;
+  }
+  .phase:last-child{ border-right:none; }
+  .phase-label{
+    font-family:var(--font-mono);
+    color: var(--ink-invert);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 4px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* ---- the concurrent band: under the bar, not in the stack ------ */
+  .overlay-track{
+    position:relative;
+    height: 24px;
+    margin-top: 3px;
+  }
+  .overlay-band{
+    position:absolute;
+    top: 0;
+    height: 20px;
+    background: var(--phase-enable);
+    border: 1px solid var(--frame);
+    border-top-style: dashed;
+    display:flex;
+    align-items:center;
+    min-width: 2px;
+  }
+  .overlay-band .phase-label{ color: var(--phase-enable-ink); }
+  .overlay-aside{
+    position:absolute;
+    top: 3px;
+    left: var(--aside-left, 0px);
+    right: 0;
+    font-family:var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-quiet);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .legend{
+    display:grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .legend-row{
+    display:flex;
+    flex-wrap: wrap;
+    align-items:baseline;
+    justify-content:space-between;
+    gap: 4px 10px;
+    font-size: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .legend-row:last-child{ border-bottom:none; padding-bottom:0; }
+  .legend-row.concurrent{ border-bottom:none; padding-bottom:0; }
+  .legend-name{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .legend-name .tag{
+    font-family:var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-hint);
+    border: 1px solid var(--rule);
+    padding: 1px 4px;
+  }
+  .swatch{
+    width: 10px; height: 10px;
+    flex: 0 0 auto;
+    display:inline-block;
+    border: 1px solid var(--frame);
+  }
+  .legend-weeks{
+    font-family:var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--ink);
+    margin-left: auto;
+  }
+  .legend-weeks .aside{ color: var(--ink-hint); }
+  .legend-row.absorbed .swatch{ opacity: 0.4; }
+  .legend-row.absorbed .legend-weeks{ color: var(--ink-hint); }
+
+  /* ---- flags: things the model held back or wants to warn about ----- */
+  .flags{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .flags:empty{ display:none; }
+  .flag{
+    display:flex;
+    gap: 10px;
+    align-items: baseline;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-raised);
+    padding: 9px 11px;
+  }
+  .flag.warn{
+    border-color: var(--accent-edge);
+    background: var(--surface-hover);
+  }
+  .flag.block{
+    border: 1.5px solid var(--accent-edge);
+    background: var(--surface-hover);
+    box-shadow: inset 4px 0 0 var(--accent-edge);
+    padding-left: 15px;
+  }
+  .flag-tag{
+    font-family:var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-meta);
+    border: 1px solid var(--rule);
+    padding: 1px 4px;
+    flex: 0 0 auto;
+  }
+  .flag.block .flag-tag{
+    border-color: var(--accent-strong);
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+  .flag p{
+    margin: 0;
+    font-family:var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--ink-quiet);
+  }
+
+  .note{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    font-family:var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: var(--ink-quiet);
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+  .note p{ margin: 0; }
+  .note p.evidence{
+    border-left: 3px solid var(--rule-strong);
+    padding-left: 11px;
+  }
+
+  .excluded{
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--rule);
+  }
+  .excluded p{
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-meta);
+    margin: 0 0 8px;
+  }
+  .excluded ul{
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 6px 18px;
+  }
+  .excluded li{
+    font-family:var(--font-mono);
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--ink-quiet);
+    padding-left: 14px;
+    position:relative;
+  }
+  .excluded li::before{
+    content:"×";
+    position:absolute;
+    left: 0;
+    color: var(--ink-hint);
+  }
+
+  .footer-mark{
+    text-align:center;
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--ink-quiet);
+    margin-top: 22px;
+  }
+
+  @media (max-width: 560px){
+    .overlay-track{ height: 42px; }
+    .overlay-aside{ left: 0; top: 24px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .phase{ transition: width 0.35s ease; }
+    .overlay-band{ transition: width 0.35s ease, left 0.35s ease; }
+    .range{ transition: opacity 0.2s ease; }
+  }
+</style>
+
+<div class="sheet">
+
+  <div class="titleblock">
+    <h1>Snowflake Migration Timeline Estimator</h1>
+    <p class="sub">Scope inputs → phased duration, in weeks</p>
+  </div>
+
+  <div class="card">
+    <p class="card-label">01 — Scope</p>
+
+    <div class="group">
+      <p class="group-label">Estate</p>
+      <div class="grid">
+        <div class="field">
+          <label for="units">Migration units</label>
+          <input aria-describedby="unitsHint" type="number" id="units" min="1" max="10000" step="1" value="4">
+          <span class="hint" id="unitsHint">one database or schema domain, or one coherent report pack sharing a BI model</span>
+        </div>
+        <div class="field">
+          <label for="reports">Reports</label>
+          <input aria-describedby="reportsHint" type="number" id="reports" min="0" max="100000" step="1" value="40">
+          <span class="hint" id="reportsHint">distinct from units — every report to rebuild or repoint</span>
+        </div>
+        <div class="field">
+          <label for="biModels">BI models to repoint</label>
+          <input aria-describedby="biModelsHint" type="number" id="biModels" min="0" max="100000" step="1" value="3">
+          <span class="hint" id="biModelsHint">connection rewrite in Power Query M, embedded SQL, and a column-case map — case sensitivity is the dominant failure mode. Sublinear, and it stops growing at 250 models</span>
+        </div>
+        <div class="field">
+          <label for="dqModels">…of which DirectQuery</label>
+          <input aria-describedby="dqHint dqNote" type="number" id="dqModels" min="0" max="100000" step="1" value="0">
+          <span class="locknote" id="dqNote" hidden>no effect — no BI models in scope</span>
+          <span class="hint" id="dqHint">DirectQuery models carry ×1.8 — every interaction becomes a warehouse query</span>
+        </div>
+        <div class="field">
+          <label for="tables">Tables</label>
+          <input aria-describedby="tablesHint" type="number" id="tables" min="0" max="1000000" step="1" value="200">
+          <span class="hint" id="tablesHint">the real volume proxy — conversion work tracks table count, not terabytes. Sublinear, and it stops growing at 5,000 tables, where conversion becomes a generated pass rather than a per-object job</span>
+        </div>
+        <div class="field">
+          <label for="pipelines">Pipelines</label>
+          <input aria-describedby="pipelinesHint" type="number" id="pipelines" min="0" max="1000000" step="1" value="25">
+          <span class="hint" id="pipelinesHint">to dynamic tables, streams and tasks, or dbt — the first carries a fixed per-environment charge</span>
+        </div>
+        <div class="field">
+          <label for="procKloc">Procedural code (kLOC)</label>
+          <input aria-describedby="procKlocHint" type="number" id="procKloc" min="0" max="100000" step="1" value="40">
+          <span class="hint" id="procKlocHint">thousand lines of stored procedures, packages, macros and BTEQ — the measured driver the source label only stands in for. Validation is floored against it: Snowflake's own guidance puts testing at 3–4× code-conversion duration, and the mapping of that ratio onto this model is Sparq's</span>
+        </div>
+        <div class="field">
+          <label for="sourceSystems">Source systems</label>
+          <input aria-describedby="sourceSystemsHint" type="number" id="sourceSystems" min="1" max="1000" step="1" value="2">
+          <span class="hint" id="sourceSystemsHint">each system past the first is priced three times: +0.4 weeks in Assess for discovery and access, +0.5 in Build for its own extract path (scaled by the source platform), and +0.5 in Validation for reconciling it on its own before the validation multipliers</span>
+        </div>
+        <div class="field">
+          <label for="environments">Environments</label>
+          <input aria-describedby="environmentsHint" type="number" id="environments" min="1" max="50" step="1" value="3">
+          <span class="hint" id="environmentsHint">dev, test, prod — zero-copy clone hydrates each one after the first at ×0.35 — the one estate coefficient below 1, and the only other term that reduces the estimate is a fluent client team at ×0.9</span>
+        </div>
+        <div class="field">
+          <label for="volume">Data volume (TB)</label>
+          <input aria-describedby="volumeHint" type="number" id="volume" min="0" max="1000000" step="1" value="8">
+          <span class="hint" id="volumeHint">barely moves the estimate — COPY INTO and Snowpipe run at minutes per terabyte</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Source &amp; code conversion</p>
+      <div class="stack">
+        <div class="field">
+          <label for="platform">Source platform</label>
+          <span class="select-wrap">
+            <select aria-describedby="platformHint" id="platform">
+              <option value="cloudDw">Modern cloud DW — baseline (×1.00)</option>
+              <option value="redshift">Redshift (×1.10)</option>
+              <option value="synapse">Azure Synapse dedicated pool (×1.15)</option>
+              <option value="bigquery">BigQuery (×1.20)</option>
+              <option value="netezza">Netezza (×1.20)</option>
+              <option value="databricks">Databricks (×1.25, high variance)</option>
+              <option value="onpremSql" selected>On-prem SQL Server (×1.25)</option>
+              <option value="teradata">Teradata (×1.40)</option>
+              <option value="oracle">Oracle (×1.45)</option>
+            </select>
+          </span>
+          <span class="hint" id="platformHint">a compressed range, because SnowConvert is first-party for the hardest sources — and cloud-to-cloud is not the easy case: BigQuery sits above Synapse and Redshift because SnowConvert covers only its tables and views</span>
+        </div>
+
+        <div class="field">
+          <div class="toggle-row" style="border-top:none;padding-top:0;">
+            <span class="toggle-copy">
+              <label for="convMeasured">SnowConvert assessment run</label>
+              <span class="hint" id="convMeasuredHint">turn this on when you have a real conversion rate from an assessment report — it takes over from the platform label</span>
+            </span>
+            <span class="switch">
+              <input aria-describedby="convMeasuredHint" type="checkbox" id="convMeasured">
+              <span class="track"></span>
+              <span class="knob"></span>
+            </span>
+          </div>
+          <div class="subfield">
+            <label for="convRate">Measured conversion rate (%)</label>
+            <input aria-describedby="convNote" type="number" id="convRate" min="1" max="99" step="1" value="75" disabled>
+            <span class="locknote" id="convNote">run a SnowConvert assessment to enable — until then the source label stands in</span>
+          </div>
+          <div class="readout" id="convReadout"></div>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="collation">Case-insensitive source collation</label>
+            <span class="hint" id="collationHint">Snowflake VARCHAR is case-sensitive by default, so a CI source legitimately changes join and GROUP BY cardinality — and COLLATE has documented holes</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="collationHint" type="checkbox" id="collation">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">BI &amp; semantic layer</p>
+      <div class="stack">
+        <div class="field">
+          <label for="biShape">BI model shape</label>
+          <span class="select-wrap">
+            <select aria-describedby="biShapeHint biShapeNote" id="biShape">
+              <option value="clean">Clean repoint (connection only)</option>
+              <option value="mixed" selected>Mixed — embedded SQL and case mapping</option>
+              <option value="heavy">Heavy rework (dialect SQL, RLS into Snowflake RBAC)</option>
+            </select>
+          </span>
+          <span class="locknote" id="biShapeNote" hidden>no effect — no BI models in scope</span>
+          <span class="hint" id="biShapeHint">repointing rewrites connection parameters and embedded SQL and generates a column-case map — it is not a storage-mode rebuild, so it prices at ×0.6 of the Fabric Direct Lake term</span>
+        </div>
+
+        <div class="toggle-row" id="ssoRow">
+          <span class="toggle-copy">
+            <label for="sso">Per-user SSO entitlement</label>
+            <span class="hint" id="ssoHint">Entra ID SSO to Snowflake supports only DirectQuery, so this forces every model onto DirectQuery — which forces warehouse and credit design. Adds 1–3 weeks of IdP calendar</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="ssoHint" type="checkbox" id="sso">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Platform, security &amp; connectivity</p>
+      <div class="stack">
+        <div class="field">
+          <label id="editionLabel">Snowflake edition</label>
+          <div class="segmented" id="edition" role="radiogroup" aria-labelledby="editionLabel" aria-describedby="editionHint" data-value="enterprise">
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="standard">Standard</button>
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-val="enterprise" class="active">Enterprise</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="bizCritical">Business Critical</button>
+          </div>
+          <span class="hint" id="editionHint">a feature gate, not a multiplier. Enterprise gates multi-cluster warehouses, materialized views, search optimization and row/column-level security; Business Critical gates PrivateLink and PHI under HIPAA/HITRUST with a signed BAA</span>
+        </div>
+
+        <div class="field">
+          <label for="region">Region &amp; cloud footprint</label>
+          <span class="select-wrap">
+            <select aria-describedby="regionHint" id="region">
+              <option value="single" selected>Single region</option>
+              <option value="multi">Multi-region, same cloud</option>
+              <option value="crossCloud">Cross-cloud</option>
+            </select>
+          </span>
+          <span class="hint" id="regionHint">same-region transfer is free; cross-region and cross-cloud bill per byte, and failover of account objects needs Business Critical</span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="privateLink">Private connectivity (PrivateLink)</label>
+            <span class="hint" id="privateLinkHint">2–6 weeks of client calendar, not Sparq effort — Snowflake hands you an identifier and the client's network team creates the endpoint. Needs Business Critical</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="privateLinkHint" type="checkbox" id="privateLink">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="byoc">Openflow BYOC ingestion runtime</label>
+            <span class="hint" id="byocHint">BI tools connect directly, so gateway effort is zero — this is the one case that brings a gateway-shaped VPC, NLB and EKS footprint back as real effort the client's platform team owns</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="byocHint" type="checkbox" id="byoc">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="regulated">Regulated data</label>
+            <span class="hint" id="regulatedHint">adds control design in build, evidence in waves, and a week of hypercare — and cross-links to the edition gate</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="regulatedHint" type="checkbox" id="regulated">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Delivery</p>
+      <div class="stack">
+        <div class="field">
+          <label for="provisioning">Provisioning lead time</label>
+          <span class="select-wrap">
+            <select aria-describedby="provisioningHint" id="provisioning">
+              <option value="none">Already provisioned (0)</option>
+              <option value="standard" selected>Standard (3 weeks)</option>
+              <option value="slow">Slow client IT (8 weeks)</option>
+            </select>
+          </span>
+          <span class="hint" id="provisioningHint">account, network policy and rules, RBAC role model, service-user key-pair auth — client-IT calendar, not Sparq effort; it runs alongside Assess. PrivateLink and SSO add to it</span>
+        </div>
+
+        <div class="field">
+          <label id="complexityLabel">Dependency complexity</label>
+          <div class="segmented" id="complexity" role="radiogroup" aria-labelledby="complexityLabel" aria-describedby="complexityHint" data-value="medium">
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="low">Low</button>
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-val="medium" class="active">Medium</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="high">High</button>
+          </div>
+          <span class="hint" id="complexityHint">stored procs, RBAC, dbt models, and downstream BI touching this data</span>
+        </div>
+
+        <div class="field">
+          <label id="experienceLabel">Client team's Snowflake fluency</label>
+          <div class="segmented" id="experience" role="radiogroup" aria-labelledby="experienceLabel" aria-describedby="experienceHint" data-value="some">
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="new">New to it</button>
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-val="some" class="active">Some reps</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="fluent">Fluent</button>
+          </div>
+          <span class="hint" id="experienceHint">the client's own team, not Sparq's — Snowflake SQL, RBAC design and cost awareness, which a team off a fixed-capacity platform has no instinct for. It prices validation, enablement and hypercare in full, gates wave sign-off at half strength, and leaves Sparq's build work alone</span>
+        </div>
+
+        <div class="field">
+          <label id="streamsLabel">Delivery streams</label>
+          <div class="segmented" id="streams" role="radiogroup" aria-labelledby="streamsLabel" aria-describedby="streamsHint" data-value="1">
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-val="1" class="active">1</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="2">2</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="3">3</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="4">4</button>
+          </div>
+          <span class="hint" id="streamsHint">parallel crews — the wave and validation split is sub-linear and capped at 2.2×; each crew adds coordination to build</span>
+        </div>
+
+        <div class="field">
+          <label id="dqDebtLabel">Data quality debt</label>
+          <div class="segmented" id="dqDebt" role="radiogroup" aria-labelledby="dqDebtLabel" aria-describedby="dqDebtHint" data-value="low">
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-val="low" class="active">Low</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="medium">Medium</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="high">High</button>
+          </div>
+          <span class="hint" id="dqDebtHint">weighted harder on validation than on the waves: with PK, UNIQUE and FK unenforced, and RELY able to make DML write incorrect data, DQ debt is a correctness risk here, not cleanup</span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="finops">Credit governance / FinOps</label>
+            <span class="hint" id="finopsHint">budgets, resource monitors and usage views — on by default, because consumption is unbounded and backfill and parallel run are the peak-spend windows</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="finopsHint" type="checkbox" id="finops" checked>
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="sharing">Data sharing / Marketplace listings</label>
+            <span class="hint" id="sharingHint">listings to named accounts or the Marketplace, plus reader-account bootstrap — a new reader account has one admin user, so roles, warehouses and shared databases are built per consumer</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="sharingHint" type="checkbox" id="sharing">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="zeroDowntime">Zero-downtime cutover</label>
+            <span class="hint" id="zeroDowntimeHint">forces a parallel run — old and new stay live together</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="zeroDowntimeHint" type="checkbox" id="zeroDowntime">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row" id="parallelRow">
+          <span class="toggle-copy">
+            <label for="parallelRun">Parallel run</label>
+            <span class="locknote" id="parallelNote" hidden>on automatically — zero-downtime cutover</span>
+          </span>
+          <span class="switch">
+            <input aria-describedby="parallelNote" type="checkbox" id="parallelRun">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="closeCycle">Longest close cycle</label>
+          <span class="select-wrap">
+            <select aria-describedby="closeHint" id="closeCycle" disabled>
+              <option value="none">No close to tie off</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+          </span>
+          <span class="hint" id="closeHint">turn on parallel run to set this — the close cycle is what the parallel run has to cover</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">02 — Estimate</p>
+
+    <div class="result-headline">
+      <div class="range" id="rangeOut" aria-live="polite">—</div>
+      <div class="unit">weeks, provisioning through hypercare</div>
+    </div>
+
+    <!-- The headline and the flag list announce themselves as they change; this
+         node is the one-sentence version of the whole answer, for a reader who
+         gets the numbers without the shape around them. -->
+    <p class="sr-only" id="srSummary" role="status"></p>
+
+    <div class="ruler" id="ruler"></div>
+    <div class="timeline" id="timeline"></div>
+    <div class="overlay-track" id="overlayTrack"></div>
+
+    <div class="flags" id="flags" aria-live="polite"></div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="note" id="assumptions"></div>
+
+    <div class="excluded">
+      <p>Excluded</p>
+      <ul>
+        <li>Data quality remediation — fixing bad source data, as distinct from proving parity, which the validation phase covers</li>
+        <li>Source-system decommissioning</li>
+        <li>Net-new feature development — including Snowflake semantic views, which nothing in a Power BI or Tableau estate needs in order to run on Snowflake</li>
+        <li>Credit and storage consumption — the FinOps workstream designs the controls, it does not price the spend</li>
+        <li>Edition upgrade and BAA negotiation — commercial, not delivery</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-mark">planning estimate — not a quote; re-run after a SnowConvert assessment</div>
+
+</div>
+
+<script>
+  const els = {
+    units: document.getElementById('units'),
+    reports: document.getElementById('reports'),
+    biModels: document.getElementById('biModels'),
+    dqModels: document.getElementById('dqModels'),
+    dqNote: document.getElementById('dqNote'),
+    tables: document.getElementById('tables'),
+    pipelines: document.getElementById('pipelines'),
+    procKloc: document.getElementById('procKloc'),
+    sourceSystems: document.getElementById('sourceSystems'),
+    environments: document.getElementById('environments'),
+    volume: document.getElementById('volume'),
+    platform: document.getElementById('platform'),
+    convMeasured: document.getElementById('convMeasured'),
+    convRate: document.getElementById('convRate'),
+    convNote: document.getElementById('convNote'),
+    convReadout: document.getElementById('convReadout'),
+    collation: document.getElementById('collation'),
+    biShape: document.getElementById('biShape'),
+    biShapeNote: document.getElementById('biShapeNote'),
+    sso: document.getElementById('sso'),
+    edition: document.getElementById('edition'),
+    region: document.getElementById('region'),
+    privateLink: document.getElementById('privateLink'),
+    byoc: document.getElementById('byoc'),
+    regulated: document.getElementById('regulated'),
+    provisioning: document.getElementById('provisioning'),
+    complexity: document.getElementById('complexity'),
+    experience: document.getElementById('experience'),
+    streams: document.getElementById('streams'),
+    dqDebt: document.getElementById('dqDebt'),
+    finops: document.getElementById('finops'),
+    sharing: document.getElementById('sharing'),
+    zeroDowntime: document.getElementById('zeroDowntime'),
+    parallelRun: document.getElementById('parallelRun'),
+    parallelNote: document.getElementById('parallelNote'),
+    closeCycle: document.getElementById('closeCycle'),
+    closeHint: document.getElementById('closeHint'),
+    rangeOut: document.getElementById('rangeOut'),
+    srSummary: document.getElementById('srSummary'),
+    ruler: document.getElementById('ruler'),
+    timeline: document.getElementById('timeline'),
+    overlayTrack: document.getElementById('overlayTrack'),
+    flags: document.getElementById('flags'),
+    legend: document.getElementById('legend'),
+    assumptions: document.getElementById('assumptions'),
+  };
+
+  // ---- source platforms -------------------------------------------------
+  // srcMult is the compressed 1.00–1.45 table, and it now reaches ONLY the
+  // source-side wave terms: units, tables, pipelines and procedural code. It
+  // never touches report or BI-model work — a Power BI model repointed at
+  // Snowflake is not harder for the source having been Oracle. The Fabric
+  // sibling restricts its own source multiplier the same way as of REV. D, so
+  // the two tools agree on this: report and BI work sit in a separate stack
+  // that never carries the source label. The coefficients on each side were
+  // calibrated independently and are not meant to match.
+  //
+  // impliedRate is the conversion rate the label is standing in for while no
+  // assessment has been run. SnowConvert reports a real conversion rate on the
+  // client's own code, so the label is a placeholder for a measurement, not a
+  // finding — and the moment the measurement exists it takes over.
+  const PLATFORMS = {
+    cloudDw:    { label:'Modern cloud DW',            srcMult:1.00, buildMult:1.00, impliedRate:0.85, onPrem:false },
+    redshift:   { label:'Redshift',                   srcMult:1.10, buildMult:1.00, impliedRate:0.75, onPrem:false },
+    synapse:    { label:'Azure Synapse dedicated pool',srcMult:1.15, buildMult:1.00, impliedRate:0.80, onPrem:false },
+    bigquery:   { label:'BigQuery',                   srcMult:1.20, buildMult:1.00, impliedRate:0.60, onPrem:false },
+    netezza:    { label:'Netezza',                    srcMult:1.20, buildMult:1.15, impliedRate:0.80, onPrem:true  },
+    databricks: { label:'Databricks',                 srcMult:1.25, buildMult:1.05, impliedRate:0.65, onPrem:false, variance:true },
+    onpremSql:  { label:'On-prem SQL Server',         srcMult:1.25, buildMult:1.20, impliedRate:0.78, onPrem:true  },
+    teradata:   { label:'Teradata',                   srcMult:1.40, buildMult:1.25, impliedRate:0.72, onPrem:true  },
+    oracle:     { label:'Oracle',                     srcMult:1.45, buildMult:1.30, impliedRate:0.70, onPrem:true  },
+  };
+
+  const REGIONS = {
+    single:     { label:'single region',        build:0   },
+    multi:      { label:'multi-region',         build:1.5 },
+    crossCloud: { label:'cross-cloud',          build:2.5 },
+  };
+
+  const EDITIONS = {
+    standard:    { label:'Standard',          build:0   },
+    enterprise:  { label:'Enterprise',        build:0   },
+    bizCritical: { label:'Business Critical', build:0.8 },
+  };
+
+  // Snowflake publishes exactly one duration ratio: the testing phase runs
+  // 3–4× the code-conversion duration. Unit and integration testing are already
+  // priced inside the wave coefficients, so only the parity tail lands in the
+  // Validation phase. TESTING_RATIO × POST_WAVE_SHARE is Sparq's mapping of the
+  // vendor ratio onto this model — the ratio is Snowflake's, the mapping is not.
+  const TESTING_RATIO   = 2.6;
+  const POST_WAVE_SHARE = 0.35;
+
+  // The table count and the BI-model count were the only two estate terms left
+  // linear and uncapped, which is what let a large estate print a number no one
+  // would defend. Both now taper on the same exponents the neighbouring terms
+  // use — 0.80 as for reports and pipelines, 0.85 as for units — and both stop
+  // growing at a knee.
+  //
+  // The coefficients are not chosen, they are anchored: each is solved so the
+  // tapered curve passes exactly through the mid-market EDW that calibrated the
+  // linear version (1,500 tables = 6.0 weeks; 15 models count as 15), so the
+  // middle of the range does not move and only the tail comes in.
+  //
+  // The knees are where per-object estimating stops being the right instrument.
+  // Past 5,000 tables or 250 BI models nobody converts objects one at a time —
+  // the work becomes a generated pass over a template plus a review sample, and
+  // its duration is set by the harness and the review capacity, not the count.
+  // Above a knee the term is a floor, and the interface has to say so.
+  const TABLE_EXP = 0.80, TABLE_KNEE = 5000;
+  const TABLE_COEF = 6.0 / Math.pow(1500, TABLE_EXP);
+  const BI_EXP = 0.85, BI_KNEE = 250;
+  const BI_COEF = 15 / Math.pow(15, BI_EXP);
+
+  // First environment: storage integration and external stage, RBAC functional
+  // and access roles, service-user key-pair auth, network rules, warehouses per
+  // workload class, resource monitors, database and schema layout, Time Travel
+  // retention. Every environment after it is hydrated by zero-copy clone.
+  const ENV_FIRST  = 1.2;
+  const CLONE_RATE = 0.35;
+
+  // A segmented control is a radio group, and it has to say so: the container
+  // carries role=radiogroup and is named by its own visible label, each option
+  // carries role=radio and its own aria-checked, and the group is ONE tab stop
+  // with a roving tabindex — the arrows move inside it, as a radio group is
+  // expected to. Click, Space and Enter keep working untouched: the options are
+  // still real buttons, and a button activates on both keys natively.
+  function setupSegmented(container){
+    const options = () => [...container.querySelectorAll('button')];
+    options().forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        setSegmented(container, btn.dataset.val);
+        compute();
+      });
+    });
+    container.addEventListener('keydown', e => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const list = options().filter(b => !b.disabled);
+      if (!list.length) return;
+      const at = list.indexOf(document.activeElement);
+      let next;
+      switch (e.key){
+        case 'ArrowLeft':
+        case 'ArrowUp':    next = (at <= 0 ? list.length : at) - 1; break;
+        case 'ArrowRight':
+        case 'ArrowDown':  next = at < 0 ? 0 : (at + 1) % list.length; break;
+        case 'Home':       next = 0; break;
+        case 'End':        next = list.length - 1; break;
+        default: return;
+      }
+      e.preventDefault();
+      const btn = list[next];
+      setSegmented(container, btn.dataset.val);
+      btn.focus();
+      compute();
+    });
+  }
+  function setSegmented(container, val){
+    container.querySelectorAll('button').forEach(b => {
+      const on = b.dataset.val === val;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+    container.dataset.value = val;
+  }
+  [els.complexity, els.experience, els.streams, els.dqDebt, els.edition]
+    .forEach(setupSegmented);
+
+  const COUNT_FIELDS = ['units','reports','biModels','dqModels','tables','pipelines',
+                        'procKloc','sourceSystems','environments','volume','convRate'];
+  COUNT_FIELDS.forEach(k => els[k].addEventListener('input', compute));
+
+  // The min, max and step attributes in the markup are the single source of
+  // truth for each field: the browser reflects them, num() clamps the maths to
+  // min and max, and this puts an out-of-range or off-step field back inside
+  // them on commit (change / blur) only — never mid-keystroke, so a value being
+  // typed is left alone and the caret never jumps.
+  //
+  // step matters as much as the range, and the browser only enforces it on the
+  // spinners and on form validation, never on typed input: a typed 12.7 in an
+  // integer field otherwise survives into the maths, and the prose then prints
+  // a rounded count beside weeks computed from the unrounded one — the printed
+  // number disagreeing with the printed consequence of it. Normalising has to
+  // recompute, or the screen keeps the figure the old value produced.
+  function stepOf(el){
+    const st = parseFloat(el.getAttribute('step'));
+    return Number.isFinite(st) && st > 0 ? st : 0;
+  }
+  COUNT_FIELDS.forEach(k => els[k].addEventListener('change', () => {
+    const el = els[k];
+    const lo = floorOf(el), hi = limitOf(el);
+    const v = parseFloat(el.value);
+    let normalised = !Number.isFinite(v) ? lo : v;
+    const st = stepOf(el);
+    if (st){
+      const base = Number.isFinite(lo) ? lo : 0;
+      normalised = base + Math.round((normalised - base) / st) * st;
+    }
+    normalised = Math.min(hi, Math.max(lo, normalised));
+    if (String(normalised) !== el.value){
+      el.value = String(normalised);
+      compute();
+    }
+  }));
+
+  // DirectQuery models cannot exceed the models in scope. The maths clamps
+  // continuously; this snaps the field itself on commit so what is on screen is
+  // what was computed.
+  const clampDq = () => {
+    if (els.dqModels.disabled) return;
+    const bi = num(els.biModels, 0);
+    if (parseFloat(els.dqModels.value) > bi){
+      els.dqModels.value = String(bi);
+      manual.dqModels = els.dqModels.value;
+      compute();
+    }
+  };
+  els.dqModels.addEventListener('change', clampDq);
+  els.biModels.addEventListener('change', clampDq);
+
+  // The user's own last setting for every control something else can force or
+  // lock. A forced control is a display state over this value, not a
+  // replacement for it, so releasing the force restores exactly what the user
+  // chose and the estimate never depends on click order.
+  const manual = {
+    parallelRun: els.parallelRun.checked,
+    biShape: els.biShape.value,
+    dqModels: els.dqModels.value,
+  };
+  els.biShape.addEventListener('change', () => {
+    if (!els.biShape.disabled) manual.biShape = els.biShape.value;
+  });
+  ['input','change'].forEach(ev => els.dqModels.addEventListener(ev, () => {
+    if (!els.dqModels.disabled) manual.dqModels = els.dqModels.value;
+  }));
+  els.parallelRun.addEventListener('change', () => {
+    if (!els.parallelRun.disabled) manual.parallelRun = els.parallelRun.checked;
+  });
+
+  [els.platform, els.convMeasured, els.collation, els.biShape, els.sso, els.region,
+   els.privateLink, els.byoc, els.regulated, els.provisioning, els.finops, els.sharing,
+   els.zeroDowntime, els.parallelRun, els.closeCycle]
+    .forEach(el => el.addEventListener('change', compute));
+
+  const PHASE_COLORS = {
+    provision:'var(--phase-provision)',
+    assess:   'var(--phase-assess)',
+    build:    'var(--phase-build)',
+    pilot:    'var(--phase-pilot)',
+    waves:    'var(--phase-waves)',
+    recon:    'var(--phase-recon)',
+    parallel: 'var(--phase-parallel)',
+    hyper:    'var(--phase-hyper)',
+    enable:   'var(--phase-enable)',
+    enableCp: 'var(--phase-enable)',
+  };
+
+  const PHASE_LABEL_INK = {
+    provision:'var(--phase-provision-ink)',
+    assess:   'var(--phase-assess-ink)',
+    build:    'var(--phase-build-ink)',
+    pilot:    'var(--phase-pilot-ink)',
+    waves:    'var(--phase-waves-ink)',
+    recon:    'var(--phase-recon-ink)',
+    parallel: 'var(--phase-parallel-ink)',
+    hyper:    'var(--phase-hyper-ink)',
+    enable:   'var(--phase-enable-ink)',
+    enableCp: 'var(--phase-enable-ink)',
+  };
+
+  function limitOf(el){
+    const m = parseFloat(el.getAttribute('max'));
+    return Number.isFinite(m) ? m : Infinity;
+  }
+  function floorOf(el){
+    const m = parseFloat(el.getAttribute('min'));
+    return Number.isFinite(m) ? m : -Infinity;
+  }
+  function fmtInt(n){ return Math.round(n).toLocaleString('en-US'); }
+  function fmt1(n){
+    return n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  }
+  // For a figure that is quoted as a coefficient rather than as weeks: print
+  // what the model actually used, not a one-decimal rounding of it. 0.75 is
+  // +0.75, not +0.8.
+  function fmtExact(n){
+    return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+  function fmt2(n){
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function num(el, min){
+    const v = parseFloat(el.value);
+    if (!Number.isFinite(v)) return min;
+    return Math.min(limitOf(el), Math.max(min, v));
+  }
+
+  function setForced(input, note, forced, manualValue){
+    input.checked = forced ? true : manualValue;
+    input.disabled = forced;
+    note.hidden = !forced;
+  }
+
+  // The two controls whose value is a field rather than a checkbox restore on
+  // the RELEASE EDGE, not on every pass. Restoring on every pass would fight
+  // the user: compute() runs on the first keystroke, before the handler that
+  // records what they typed, so a value being entered would be read as a
+  // divergence from `manual` and written straight back.
+  let dqWasForced = false;
+  let biShapeWasLocked = false;
+
+  // Interlocks that hold whatever order the user clicks things in.
+  function syncLocks(){
+    // Zero-downtime means both systems stay live: a parallel run is the mechanism.
+    setForced(els.parallelRun, els.parallelNote, els.zeroDowntime.checked, manual.parallelRun);
+    const parallelInEffect = els.zeroDowntime.checked || els.parallelRun.checked;
+    els.closeCycle.disabled = !parallelInEffect;
+    els.closeHint.textContent = parallelInEffect
+      ? 'the parallel run has to survive one full close of this length'
+      : 'turn on parallel run to set this — the close cycle is what the parallel run has to cover';
+
+    // BI model shape and the DirectQuery count only reach the maths through the
+    // BI term. With no models in scope they are inert, so they are shown locked
+    // rather than left looking live — and the lock is a display state over the
+    // user's own setting, put back untouched the moment models reappear.
+    const biModels = num(els.biModels, 0);
+    const noBi = biModels === 0;
+    els.biShape.disabled = noBi;
+    els.biShapeNote.hidden = !noBi;
+    if (!noBi && biShapeWasLocked) els.biShape.value = manual.biShape;
+    biShapeWasLocked = noBi;
+
+    // Entra ID SSO to Snowflake supports DirectQuery only, so a per-user
+    // entitlement requirement is not a preference — it puts every model on
+    // DirectQuery, and the count stops being the user's to set.
+    const dqForced = els.sso.checked && !noBi;
+    els.dqModels.disabled = noBi || dqForced;
+    els.dqNote.hidden = !(noBi || dqForced);
+    els.dqNote.textContent = dqForced
+      ? 'all models — Entra ID SSO to Snowflake supports DirectQuery only'
+      : 'no effect — no BI models in scope';
+    if (dqForced){
+      els.dqModels.value = String(biModels);
+    } else if (dqWasForced){
+      // The release edge, and it has two causes that are not the same event.
+      //
+      // SSO going off is a real release: the models in scope can have shrunk
+      // while the force was on, so the stored value is clamped as it is handed
+      // back rather than restored to a figure the field can no longer mean.
+      //
+      // The BI count reaching zero is NOT a release — the force is still on,
+      // it simply has nothing to apply to. And an empty field parses as zero,
+      // which is what any retype of a multi-digit number passes through, so
+      // clamping here would quietly destroy a real DirectQuery count against a
+      // number the user is still in the middle of typing. The force re-asserts
+      // itself the moment a count reappears and the clamp happens then, on the
+      // release that actually is one.
+      if (!noBi){
+        manual.dqModels = String(Math.min(parseFloat(manual.dqModels) || 0, biModels));
+      }
+      els.dqModels.value = manual.dqModels;
+    }
+    dqWasForced = dqForced;
+
+    // A conversion rate is a statement about procedural code. With none in
+    // scope there is nothing for it to scale, so both controls go inert.
+    const noProc = num(els.procKloc, 0) === 0;
+    els.convMeasured.disabled = noProc;
+    els.convRate.disabled = noProc || !els.convMeasured.checked;
+    els.convNote.hidden = !els.convRate.disabled;
+    els.convNote.textContent = noProc
+      ? 'no effect — no procedural code in scope'
+      : 'run a SnowConvert assessment to enable — until then the source label stands in';
+  }
+
+  function compute(){
+    syncLocks();
+
+    // ---- inputs, guarded ------------------------------------------------
+    const units         = Math.max(1, num(els.units, 1));
+    const reports       = num(els.reports, 0);
+    const biModels      = num(els.biModels, 0);
+    const tables        = num(els.tables, 0);
+    const pipelines     = num(els.pipelines, 0);
+    const procKloc      = num(els.procKloc, 0);
+    const sourceSystems = Math.max(1, num(els.sourceSystems, 1));
+    const environments  = Math.max(1, num(els.environments, 1));
+    const volumeTB      = num(els.volume, 0);
+
+    const platform   = PLATFORMS[els.platform.value] || PLATFORMS.onpremSql;
+    const isOnPrem   = platform.onPrem;
+    const regulated  = els.regulated.checked;
+    const edition    = EDITIONS[els.edition.dataset.value] ? els.edition.dataset.value : 'enterprise';
+    const region     = REGIONS[els.region.value] ? els.region.value : 'single';
+    const byoc       = els.byoc.checked;
+    const collation  = els.collation.checked;
+    const sso        = els.sso.checked;
+    const privateLink= els.privateLink.checked;
+    const finops     = els.finops.checked;
+    const sharing    = els.sharing.checked;
+
+    const dqModels     = Math.min(biModels, sso ? biModels : num(els.dqModels, 0));
+
+    const complexity   = els.complexity.dataset.value;
+    const experience   = els.experience.dataset.value;
+    const streams      = Math.max(1, parseInt(els.streams.dataset.value, 10) || 1);
+    const dqDebt       = els.dqDebt.dataset.value;
+    const biShape      = els.biShape.value;
+    const zeroDowntime = els.zeroDowntime.checked;
+    const parallelRun  = zeroDowntime || els.parallelRun.checked;
+    const closeCycle   = els.closeCycle.value;
+
+    const measured = els.convMeasured.checked && procKloc > 0;
+    const convRate = num(els.convRate, 1) / 100;
+
+    const expMult     = { new: 1.6, some: 1.0, fluent: 0.9 }[experience] || 1.0;
+    const perUnit     = { low: 0.8, medium: 1.3, high: 2.2 }[complexity] || 1.3;
+    const dqMult      = { low: 1.0, medium: 1.10, high: 1.25 }[dqDebt] || 1.0;
+    // DQ debt is weighted harder on reconciliation than on the waves: with
+    // PK/UNIQUE/FK unenforced and RELY able to make DML and CTAS write
+    // incorrect data, bad data is a correctness risk here, not cleanup.
+    const dqReconMult = { low: 1.0, medium: 1.20, high: 1.45 }[dqDebt] || 1.0;
+    // ×0.6 of the Fabric Direct Lake coefficients: repointing rewrites the
+    // connection, the embedded SQL and a column-case map. It is not a
+    // storage-mode rebuild.
+    const perModel    = { clean: 0.18, mixed: 0.48, heavy: 1.20 }[biShape] || 0.48;
+
+    // ---- calendar. PrivateLink and SSO/SCIM are client-IT lead time, never
+    // effort: Snowflake hands over an identifier and the client's own network
+    // team creates the endpoint. Snowflake publishes no duration for either.
+    const leadBase  = { none: 0, standard: 3, slow: 8 }[els.provisioning.value] || 0;
+    const leadWeeks = leadBase + (privateLink ? 4 : 0) + (sso ? 2 : 0);
+
+    // ---- the measured input, and the label it demotes --------------------
+    // With no assessment, the platform label carries the source-side work at
+    // full strength and stands in for a conversion rate. With one, the measured
+    // rate drives the procedural term outright and the label's weight on the
+    // rest of the source-side work drops to 40% of its excess over 1.
+    const impliedFactor = 1 + 2 * (1 - platform.impliedRate);
+    const procFactor    = measured ? 1 + 2 * (1 - convRate) : impliedFactor;
+    const srcApplied    = measured ? 1 + 0.4 * (platform.srcMult - 1) : platform.srcMult;
+
+    // ---- Assess — sublinear in estate breadth. With no assessment already
+    // run, running one is in scope here.
+    const assess = 1.5 + 0.9 * Math.log2(1 + units) + 0.4 * (sourceSystems - 1)
+                 + (measured ? 0 : 0.5);
+
+    // ---- Provisioning — calendar, not effort; runs concurrently with Assess,
+    // so only the overhang reaches the critical path. Snapped to zero below the
+    // draw threshold so the bar always sums to the printed point estimate.
+    let leadAdd = Math.max(0, leadWeeks - assess);
+    if (leadAdd < 0.05) leadAdd = 0;
+
+    // ---- Environments — the one estate coefficient below 1. Zero-copy
+    // clone hydrates each environment after the first from the one before it,
+    // instantly and sharing storage, with no extra cost until it is modified.
+    const envWork     = ENV_FIRST * (1 + CLONE_RATE * (environments - 1));
+    const envNoClone  = ENV_FIRST * environments;
+    const cloneSaving = envNoClone - envWork;
+
+    // ---- Build — Sparq's own foundation on the target. Not scaled by
+    // complexity, not by client fluency. The source platform reaches only the
+    // extract mechanics: there is no gateway to build, because BI tools connect
+    // to Snowflake directly.
+    const buildTarget = 1.5
+                      + (regulated ? 1.5 : 0)
+                      + (zeroDowntime ? 0.75 : 0)
+                      + 0.25 * (streams - 1)
+                      + EDITIONS[edition].build
+                      + (byoc ? 2.4 : 0)
+                      + (finops ? 0.8 : 0)
+                      + (sharing ? 2.0 : 0)
+                      + REGIONS[region].build;
+    const buildSource = (0.5 * (sourceSystems - 1) + (isOnPrem ? 1.0 : 0)) * platform.buildMult;
+    const build       = buildTarget + buildSource + envWork;
+
+    // ---- Pilot — one unit end to end, before the waves start -------------
+    const pilot = { low: 2, medium: 3, high: 4 }[complexity] || 3;
+
+    // ---- Crews — sub-linear, hard-capped ---------------------------------
+    const streamDivRaw    = Math.pow(streams, 0.85);
+    const streamDiv       = Math.min(2.2, streamDivRaw);
+    const streamDivCapped = streamDivRaw > 2.2 + 1e-9;
+
+    // ---- Waves — the conversion work itself ------------------------------
+    const unitWork   = perUnit * Math.pow(units, 0.85);
+    const tableTerm  = TABLE_COEF * Math.pow(Math.min(tables, TABLE_KNEE), TABLE_EXP);
+    const pipeWork   = pipelines > 0 ? 0.6 + 0.18 * Math.pow(pipelines, 0.8) : 0;
+    const procWork   = procKloc > 0 ? 0.22 * Math.pow(procKloc, 0.72) : 0;
+    const reportWork = 0.15 * Math.pow(reports, 0.8);
+    // The taper applies to the model COUNT; the DirectQuery uplift then rides on
+    // top of the tapered count as a mix-weighted factor, so a forced-DirectQuery
+    // estate still carries its ×1.8 rather than having it flattened by the cap.
+    const dqShare    = biModels > 0 ? dqModels / biModels : 0;
+    const biCount    = BI_COEF * Math.pow(Math.min(biModels, BI_KNEE), BI_EXP);
+    const biWork     = perModel * biCount * (1 + 0.8 * dqShare);
+    const tableKneed = tables > TABLE_KNEE;
+    const biKneed    = biModels > BI_KNEE;
+    const volTerm    = Math.min(3, Math.max(0, 0.8 * Math.log10(Math.max(volumeTB, 5) / 5)));
+
+    // Client fluency gates wave sign-off at half strength; full strength on the
+    // phases the client's team actually paces.
+    const wavesExp     = 1 + 0.5 * (expMult - 1);
+    const genericStack = wavesExp * dqMult * (regulated ? 1.15 : 1) * (collation ? 1.10 : 1);
+    // The platform multiplier is inside the source-side stack only. The BI
+    // stack carries fluency, DQ debt, regulation and collation — never the
+    // source label.
+    const srcStackRaw  = srcApplied * genericStack;
+    const srcStack     = Math.min(2.5, srcStackRaw);
+    const procStackRaw = procFactor * genericStack;
+    const procStack    = Math.min(2.5, procStackRaw);
+    // No cap on the BI stack: it carries no source multiplier, so its ceiling
+    // is 1.30 x 1.25 x 1.15 x 1.10 = 2.06 and a 2.5 cap could never bind.
+    const biStack      = genericStack;
+    const stackCapped  = srcStackRaw > 2.5 + 1e-9 || procStackRaw > 2.5 + 1e-9;
+    const stackRawTop  = Math.max(srcStackRaw, procStackRaw);
+
+    const cycleWeeks = { none: 0, daily: 2, weekly: 4, monthly: 9, quarterly: 14 };
+    const closeWeeks = parallelRun ? (cycleWeeks[closeCycle] || 0) : 0;
+    // Holding both systems in step is engineering, not waiting: CDC, delta
+    // reconciliation, catch-up loads. Added after the stack, never divided.
+    const syncWork   = parallelRun ? 0.25 * closeWeeks : 0;
+    // Backfill and parallel run are the peak-spend windows, so credit
+    // governance carries a watch cost through them as well as a design cost.
+    const finopsWave = (finops && parallelRun) ? 0.5 : 0;
+
+    const srcSide  = (unitWork + tableTerm + pipeWork) * srcStack;
+    const procTerm = procWork * procStack;
+    const biSide   = (reportWork + biWork) * biStack;
+
+    const waves = (srcSide + procTerm + biSide) / streamDiv + volTerm + syncWork + finopsWave;
+
+    // ---- Parallel run — calendar-bound; never multiplied, never divided ---
+    let parallelAdd = parallelRun ? Math.max(0, closeWeeks - 0.4 * waves) : 0;
+    if (parallelAdd < 0.05) parallelAdd = 0;
+
+    const closeState = !parallelRun          ? 'off'
+                     : closeCycle === 'none' ? 'noClose'
+                     : parallelAdd > 0       ? 'extends'
+                     : 'absorbed';
+
+    // ---- Validation and reconciliation ------------------------------------
+    // Snowflake does not enforce PK, UNIQUE or FK on standard tables, and RELY
+    // — set to recover join elimination — can make DML and CTAS write incorrect
+    // data when integrity is in fact violated. Reconciliation is therefore a
+    // precondition for the performance design, not hygiene.
+    const reconBase = (1.2 + 0.06 * Math.pow(tables, 0.7)
+                      + 0.12 * biModels
+                      + 0.5 * (sourceSystems - 1))
+                    * dqReconMult * (regulated ? 1.25 : 1) * expMult / streamDiv;
+    const codeConv     = procTerm / streamDiv;
+    const reconFloor   = TESTING_RATIO * POST_WAVE_SHARE * codeConv;
+    const recon        = Math.max(reconBase, reconFloor);
+    const reconFloored = reconFloor > reconBase + 1e-9;
+
+    // ---- Hypercare --------------------------------------------------------
+    const hyperRaw = 0.15 * (build + pilot + waves);
+    const hyper = (Math.min(10, Math.max(3, hyperRaw)) + (regulated ? 1 : 0)) * expMult;
+
+    // ---- Enablement — concurrent; 30% charged to the critical path ---------
+    const enableRaw  = 0.25 * (pilot + waves);
+    const enablement = Math.min(8, Math.max(1, enableRaw)) * expMult;
+
+    // Both ceilings are flat, so on a large estate they stop tracking scope
+    // altogether. That has to be said out loud rather than left to look computed.
+    const hyperCapped  = hyperRaw  > 10 + 1e-9;
+    const enableCapped = enableRaw >  8 + 1e-9;
+    const enableCriticalPath = 0.3 * enablement;
+
+    // The bar, the ruler, the headline and every figure in the notes are all
+    // drawn against this one number, and the segments below add up to it
+    // exactly — enablement's critical-path slice included.
+    const subtotal = leadAdd + assess + build + pilot + waves + recon
+                   + parallelAdd + hyper + enableCriticalPath;
+
+    // ---- The band ---------------------------------------------------------
+    let highMult = 1.25 + 0.10 * Math.log(1 + subtotal / 12)
+                 + (experience === 'new' ? 0.10 : 0)
+                 + (isOnPrem ? 0.08 : 0)
+                 + (regulated ? 0.08 : 0)
+                 + Math.min(0.08, 0.01 * recon)
+                 + (measured ? 0 : 0.06)
+                 + (platform.variance ? 0.10 : 0);
+    highMult = Math.min(2.0, highMult);
+    const low  = subtotal * 0.9;
+    const high = subtotal * highMult;
+
+    // ---- edition feature gates: warnings, never multipliers ---------------
+    const gateStandardRegulated = regulated && edition === 'standard';
+    const gatePrivateLink       = privateLink && edition !== 'bizCritical';
+    // Failover and failback of account objects need Business Critical whenever
+    // there is more than one region to fail over between — a second region on
+    // the same cloud is as much a replication footprint as a second cloud is,
+    // and testing only for cross-cloud left multi-region silently unwarned on
+    // every edition.
+    const gateRegionFailover    = region !== 'single' && edition !== 'bizCritical';
+    const lowRate               = measured && convRate < 0.55;
+
+    const phases = [
+      { key:'provision', label:'Provisioning',    weeks: leadAdd },
+      { key:'assess',    label:'Assess',          weeks: assess },
+      { key:'build',     label:'Build',           weeks: build },
+      { key:'pilot',     label:'Pilot',           weeks: pilot },
+      { key:'waves',     label:'Migration waves', weeks: waves },
+      { key:'recon',     label:'Validation',      weeks: recon },
+      { key:'parallel',  label:'Parallel run',    weeks: parallelAdd },
+      { key:'hyper',     label:'Hypercare',       weeks: hyper },
+      { key:'enableCp',  label:'Enablement — non-overlapping', weeks: enableCriticalPath,
+        tag:'critical path',
+        note:'the part of enablement the pilot and wave phases do not cover' },
+    ].filter(p => p.weeks > 0);   // provisioning and parallel run only when they exist
+
+    render({ low, high, subtotal, highMult, phases, enablement, enableCriticalPath, streams, build,
+             closeWeeks, experience, isOnPrem, regulated, parallelRun, volTerm,
+             closeState, closeCycle, parallelAdd, waves, recon, syncWork,
+             leadBase, leadWeeks, leadAdd, privateLink, sso, byoc,
+             srcStack, srcStackRaw, procStack, procStackRaw, biStack,
+             stackCapped, stackRawTop, streamDiv, streamDivCapped,
+             wavesExp, dqMult, genericStack, collationOn: collation,
+             hyperCapped, enableCapped, hyperRaw, enableRaw,
+             buildTarget, buildSource, zeroDowntime, byocAdd: byoc ? 2.4 : 0,
+             regionAdd: REGIONS[region].build, editionAdd: EDITIONS[edition].build,
+             finopsWave, waveOverlap: 0.4 * waves,
+             tableTerm, biCount, biWork, tables, tableKneed, biKneed,
+             TABLE_KNEE, BI_KNEE, dqShare,
+             platform, platformKey: els.platform.value, measured, convRate, procFactor,
+             impliedFactor, srcApplied, procKloc, procTerm, codeConv,
+             reconBase, reconFloor, reconFloored,
+             biModels, dqModels, biShape, collation,
+             edition, region, environments, envWork, envNoClone, cloneSaving,
+             finops, sharing, gateStandardRegulated, gatePrivateLink, gateRegionFailover, lowRate });
+  }
+
+  // Ruler spacing is derived from the total, not capped at a constant, so the
+  // tick count stays in the same handful whether the answer is 10 weeks or
+  // 3,000. Spacings are human-readable weeks (1, 2, 4, 5, 10, 20, 25 …).
+  const TICK_STEPS = (() => {
+    const out = [];
+    for (let d = 0; d < 12; d++){
+      const pow = Math.pow(10, d);
+      [1, 2, 2.5, 4, 5].forEach(mult => {
+        const step = mult * pow;
+        if (Number.isInteger(step)) out.push(step);
+      });
+    }
+    return out;
+  })();
+
+  function measureTickLabel(text){
+    const probe = document.createElement('span');
+    probe.textContent = text;
+    probe.style.visibility = 'hidden';
+    probe.style.left = '0';
+    els.ruler.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return w;
+  }
+
+  function tickStep(total, trackW){
+    const IDEAL = 9, MAX_TICKS = 20, GUTTER = 10;
+    const span = Math.max(total, 0);
+    const widest = measureTickLabel('wk ' + fmtInt(Math.floor(span)));
+    const fits = trackW > 0
+      ? Math.max(2, Math.floor(trackW / (widest + GUTTER)) + 1)
+      : MAX_TICKS;
+    const cap = Math.min(MAX_TICKS, fits);
+    const ideal = Math.min(IDEAL, cap);
+    let best = TICK_STEPS[TICK_STEPS.length - 1], bestScore = Infinity;
+    for (const step of TICK_STEPS){
+      const count = Math.floor(span / step) + 1;
+      if (count > cap) continue;
+      const score = Math.abs(count - ideal) + (count < 6 && cap >= 6 ? 5 : 0);
+      if (score < bestScore){ bestScore = score; best = step; }
+    }
+    return best;
+  }
+
+  const CLOSE_LABEL = { none:'none', daily:'daily', weekly:'weekly',
+                        monthly:'monthly', quarterly:'quarterly' };
+  const CLOSE_WINDOW = { none:'nothing',
+                         daily:'a fortnight of daily closes',
+                         weekly:'a month of weekly closes',
+                         monthly:'one full month-end close',
+                         quarterly:'one full quarter-end close' };
+
+  function render(r){
+    const { low, high, subtotal, highMult, phases, enablement } = r;
+
+    els.rangeOut.textContent = `${fmtInt(low)}–${fmtInt(high)}`;
+
+    // The bar and the ruler are drawn against the same number the headline and
+    // the assumptions text quote: the point estimate. The sequential segments —
+    // the critical-path slice of enablement included — add up to it exactly,
+    // because the two conditional phases are snapped to zero rather than
+    // filtered away while still small but non-zero.
+    const total = subtotal;
+
+    els.ruler.innerHTML = '';
+    const trackW = els.ruler.clientWidth;
+    const tickEvery = tickStep(total, trackW);
+    const labels = [];
+    for (let w = 0; w <= total + 1e-9; w += tickEvery){
+      const pct = Math.min(100, (w / total) * 100);
+      const tick = document.createElement('i');
+      tick.style.left = pct + '%';
+      els.ruler.appendChild(tick);
+      const t = document.createElement('span');
+      t.style.left = pct + '%';
+      t.textContent = 'wk ' + fmtInt(w);
+      els.ruler.appendChild(t);
+      labels.push({ el: t, pct });
+    }
+    if (trackW > 0){
+      labels.forEach(({ el, pct }) => {
+        const half = el.getBoundingClientRect().width / 2;
+        const centre = Math.min(Math.max(pct / 100 * trackW, half), Math.max(half, trackW - half));
+        el.style.left = centre + 'px';
+      });
+    }
+
+    els.timeline.innerHTML = '';
+    els.legend.innerHTML = '';
+    let enableCpRow = null;
+    phases.forEach(p => {
+      const pct = (p.weeks / total) * 100;
+      const div = document.createElement('div');
+      div.className = 'phase';
+      div.style.width = pct + '%';
+      div.style.background = PHASE_COLORS[p.key];
+      const lab = document.createElement('span');
+      lab.className = 'phase-label';
+      lab.style.color = PHASE_LABEL_INK[p.key];
+      lab.textContent = p.label;
+      div.appendChild(lab);
+      div.title = `${p.label}: ~${fmt1(p.weeks)} wks` + (p.note ? ` — ${p.note}` : '');
+      els.timeline.appendChild(div);
+
+      const row = document.createElement('div');
+      row.className = 'legend-row';
+      row.innerHTML = `
+        <span class="legend-name">
+          <span class="swatch" style="background:${PHASE_COLORS[p.key]}"></span>
+          ${p.label}
+          ${p.tag ? `<span class="tag">${p.tag}</span>` : ''}
+        </span>
+        <span class="legend-weeks">~${fmt1(p.weeks)} wks</span>
+      `;
+      els.legend.appendChild(row);
+      if (p.key === 'enableCp') enableCpRow = row;
+    });
+
+    if (r.closeState === 'absorbed' || r.closeState === 'noClose'){
+      const absorbed = r.closeState === 'absorbed';
+      const row = document.createElement('div');
+      row.className = 'legend-row absorbed';
+      row.innerHTML = `
+        <span class="legend-name">
+          <span class="swatch" style="background:${PHASE_COLORS.parallel}"></span>
+          Parallel run
+          <span class="tag">${absorbed ? 'absorbed' : 'no close'}</span>
+        </span>
+        <span class="legend-weeks">${fmt1(0)} wks <span class="aside">· ${absorbed ? 'inside migration waves' : 'nothing to tie off'}</span></span>
+      `;
+      els.legend.appendChild(row);
+    }
+
+    if (enableCpRow) els.legend.appendChild(enableCpRow);
+
+    // Labels are measured, not guessed: any band too narrow for its own name
+    // drops the label and keeps the hover title and the legend row instead.
+    els.timeline.querySelectorAll('.phase').forEach(div => {
+      const lab = div.querySelector('.phase-label');
+      if (lab && lab.scrollWidth > div.clientWidth - 2) lab.remove();
+    });
+
+    // ---- the concurrent band ---------------------------------------------
+    const pilotStart = phases
+      .filter(p => p.key === 'provision' || p.key === 'assess' || p.key === 'build')
+      .reduce((s,p) => s + p.weeks, 0);
+    const leftPct  = (pilotStart / total) * 100;
+    const widthPct = Math.min(100 - leftPct, (enablement / total) * 100);
+
+    els.overlayTrack.innerHTML = '';
+    const band = document.createElement('div');
+    band.className = 'overlay-band';
+    band.style.left = leftPct + '%';
+    band.style.width = widthPct + '%';
+    band.title = `Enablement: ~${fmt1(enablement)} wks in total, running alongside pilot and waves; ` +
+                 `the ~${fmt1(r.enableCriticalPath)} wks they do not cover is drawn as the closing segment of the bar`;
+    const lab = document.createElement('span');
+    lab.className = 'phase-label';
+    lab.style.paddingLeft = '6px';
+    lab.textContent = 'Enablement — runs in parallel';
+    band.appendChild(lab);
+    els.overlayTrack.appendChild(band);
+
+    const inWide = lab.scrollWidth <= band.clientWidth - 4;
+    if (!inWide){
+      lab.remove();
+      const aside = document.createElement('div');
+      aside.className = 'overlay-aside';
+      aside.style.setProperty('--aside-left', `calc(${Math.min(leftPct + widthPct, 74)}% + 8px)`);
+      aside.textContent = 'Enablement — runs in parallel';
+      els.overlayTrack.appendChild(aside);
+    }
+
+    // ---- the conversion readout: the structural change, made visible ------
+    if (r.procKloc === 0){
+      els.convReadout.innerHTML =
+        `No procedural code in scope, so there is nothing for a conversion rate to scale. ` +
+        `The <b>${r.platform.label}</b> label carries the source-side work at <b>×${fmt2(r.srcApplied)}</b> on its own.`;
+    } else if (r.measured){
+      els.convReadout.innerHTML =
+        `Measured <b>${fmtInt(r.convRate * 100)}%</b> conversion rate → procedural conversion <b>×${fmt2(r.procFactor)}</b>, ` +
+        `from your own assessment rather than the platform label. ` +
+        (r.platform.srcMult > 1.000001
+          ? `The <b>${r.platform.label}</b> label now carries only <b>×${fmt2(r.srcApplied)}</b> on the rest of the ` +
+            `source-side work, down from <b>×${fmt2(r.platform.srcMult)}</b> — the measurement drives the estimate ` +
+            `and the label stands back.`
+          : `<b>${r.platform.label}</b> is the ×1.00 baseline, so it was never carrying the rest of the source-side ` +
+            `work in the first place — the measurement is the only thing scaling this estate.`);
+    } else {
+      els.convReadout.innerHTML =
+        `No assessment run, so the <b>${r.platform.label}</b> label is standing in for a measurement: ` +
+        `<b>×${fmt2(r.platform.srcMult)}</b> on source-side work and <b>×${fmt2(r.impliedFactor)}</b> on procedural ` +
+        `conversion, which is an implied <b>~${fmtInt(r.platform.impliedRate * 100)}%</b> conversion rate. ` +
+        `SnowConvert measures the real rate on the client's own code — run it and this term stops being a guess.`;
+    }
+
+    // ---- flags -------------------------------------------------------------
+    els.flags.innerHTML = '';
+    const flag = (kind, tag, body) => {
+      const box = document.createElement('div');
+      box.className = kind ? 'flag ' + kind : 'flag';
+      const t = document.createElement('span');
+      t.className = 'flag-tag';
+      t.textContent = tag;
+      const para = document.createElement('p');
+      para.textContent = body;
+      box.appendChild(t);
+      box.appendChild(para);
+      els.flags.appendChild(box);
+    };
+
+    if (r.gateStandardRegulated){
+      flag('block', 'Edition — blocking',
+        `Regulated data on Standard Edition. Row access policies, column-level security, object tagging, ` +
+        `multi-cluster warehouses, materialized views and search optimization all require Enterprise; PHI under ` +
+        `HIPAA and HITRUST requires Business Critical and a signed BAA with Snowflake. That is a commercial ` +
+        `dependency on the critical path — a contract and a procurement cycle, not a configuration change — so it ` +
+        `is raised here rather than quietly priced as days. Resolve the edition before the waves are scheduled.`);
+    }
+    if (r.gatePrivateLink){
+      // The 4 weeks are always in the lead time, but they are only drawn when
+      // they overhang Assess. Citing a provisioning figure that is not on the
+      // screen contradicts the paragraph below it, which says the lead time
+      // finishes inside Assess and adds no weeks of its own.
+      flag('block', 'Edition — blocking',
+        `PrivateLink requires Business Critical or higher, and this estimate is on ` +
+        `${EDITIONS[r.edition].label}. ` +
+        (r.leadAdd > 0
+          ? `The 4 weeks of private-connectivity calendar in the provisioning figure cannot start until that ` +
+            `edition is in place.`
+          : `Its 4 weeks of private-connectivity calendar finish inside Assess and add no weeks of their own ` +
+            `here, but they still cannot start until that edition is in place.`));
+    }
+    if (r.gateRegionFailover){
+      flag('warn', 'Replication',
+        `${r.region === 'crossCloud' ? 'Cross-cloud' : 'Multi-region'} footprint on ${EDITIONS[r.edition].label}: ` +
+        `database and share replication are available on all editions, but failover and failback of account ` +
+        `objects require Business Critical. Cross-region and cross-cloud transfer also bills per byte where ` +
+        `same-region transfer is free, and crossing a region group — commercial to government or VPS — needs ` +
+        `Snowflake Support.`);
+    }
+    if (r.sso && r.biModels > 0){
+      flag('warn', 'DirectQuery forced',
+        `Per-user SSO entitlement puts all ${fmtInt(r.biModels)} BI model${r.biModels > 1 ? 's' : ''} on DirectQuery: ` +
+        `Entra ID SSO to Snowflake supports only DirectQuery. Each is priced at ×1.8, and every user interaction ` +
+        `becomes a warehouse query — so this decision also sets the warehouse and credit design, and exposes the ` +
+        `cold-start cost of the first query after each auto-suspend.`);
+    }
+    if (r.lowRate){
+      flag('warn', 'Conversion rate',
+        `A measured conversion rate of ${fmtInt(r.convRate * 100)}% puts procedural conversion at ` +
+        `×${fmt2(r.procFactor)}. Elements carrying an EWI of medium severity or higher count as not converted, ` +
+        `and functional-difference messages — code that compiles but may not behave identically — often need ` +
+        `business decisions rather than more conversion effort.`);
+    }
+    if (r.reconFloored){
+      flag('', 'Testing floor',
+        `Validation is held up to ~${fmt1(r.reconFloor)} weeks by the code-conversion volume rather than computed ` +
+        `from the estate: Snowflake's own guidance puts the testing phase at 3–4× code-conversion duration. The ` +
+        `estate formula gave ~${fmt1(r.reconBase)} weeks. The ratio is Snowflake's; mapping it onto this phase is Sparq's.`);
+    }
+    if (r.platform.variance){
+      flag('warn', 'High variance',
+        `Databricks is the widest entry in the source table. A Databricks SQL estate converts through SnowConvert; ` +
+        `PySpark, Scala and Java go through the Snowpark Migration Accelerator, whose readiness score explicitly ` +
+        `excludes third-party libraries and external dependencies — which is where these estimates usually break. ` +
+        `Treat ×1.25 as the midpoint of a 0.90–1.60 range and settle it with an assessment before quoting.`);
+    }
+    if (r.stackCapped){
+      // Two stacks can hit the cap and they do not share a first term, so the
+      // copy names the one that actually did, and lists only the factors that
+      // are not exactly 1. Naming five causes when four are ×1.00 is not a
+      // rounding problem, it is telling the reader the wrong thing.
+      const procDominant = r.procStackRaw >= r.srcStackRaw;
+      const parts = [];
+      if (procDominant){
+        parts.push(r.measured
+          ? `a measured ${fmtInt(r.convRate * 100)}% conversion rate (×${fmt2(r.procFactor)})`
+          : `the ${r.platform.label} label's implied conversion rate (×${fmt2(r.procFactor)})`);
+      } else {
+        parts.push(`the ${r.platform.label} source multiplier (×${fmt2(r.srcApplied)})`);
+      }
+      if (Math.abs(r.wavesExp - 1) > 1e-6) parts.push(`client fluency (×${fmt2(r.wavesExp)})`);
+      if (r.dqMult > 1.000001)             parts.push(`data-quality debt (×${fmt2(r.dqMult)})`);
+      if (r.regulated)                     parts.push(`regulated data (×1.15)`);
+      if (r.collationOn)                   parts.push(`case-insensitive collation (×1.10)`);
+      flag('', 'Capped',
+        `The ${procDominant ? 'procedural-conversion' : 'source-side'} multiplier stack reaches ` +
+        `${fmt2(r.stackRawTop)}× on the migration waves` +
+        (parts.length === 1
+          ? `, entirely from ${parts[0]}`
+          : `, from ${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`) +
+        `. The stack is capped at 2.5×, so the wave figure is held back rather than computed straight — treat ` +
+        `it as a floor.`);
+    }
+    if (r.tableKneed){
+      flag('warn', 'Ceiling — tables',
+        `The table term stops growing at ${fmtInt(r.TABLE_KNEE)} tables and this estate has ` +
+        `${fmtInt(r.tables)}, so the ~${fmt1(r.tableTerm)} weeks of table conversion in the waves is a floor, ` +
+        `not a count. Past that point a migration stops converting objects one at a time: the work becomes a ` +
+        `generated pass over a template plus a reviewed sample, and its duration is set by the harness and the ` +
+        `review capacity rather than by how many tables there are. Scope the overflow as a programme of its own — ` +
+        `do not read this figure as covering all ${fmtInt(r.tables)}.`);
+    }
+    if (r.biKneed){
+      flag('warn', 'Ceiling — BI models',
+        `The BI term stops growing at ${fmtInt(r.BI_KNEE)} models and this estate has ${fmtInt(r.biModels)}, so ` +
+        `the ~${fmt1(r.biWork)} weeks of repointing is a floor, not a count — it prices ` +
+        `${fmt1(r.biCount)} models' worth of work` +
+        (r.dqShare > 0.001 ? ` at the DirectQuery-weighted rate` : ``) +
+        `. At this size repointing is a scripted pass over the estate with a reviewed sample, not a per-model ` +
+        `job — scope the remainder separately.`);
+    }
+    if (r.hyperCapped || r.enableCapped){
+      const which = r.hyperCapped && r.enableCapped
+        ? `Hypercare is held at its 10-week ceiling and enablement at its 8-week ceiling`
+        : r.hyperCapped ? `Hypercare is held at its 10-week ceiling` : `Enablement is held at its 8-week ceiling`;
+      flag('', 'Scale ceiling',
+        `${which} on an estate this size. Those ceilings are flat, so above them neither phase tracks scope any ` +
+        `further — computed straight they would be ` +
+        `${r.hyperCapped ? `~${fmt1(r.hyperRaw)} weeks of hypercare` : ''}` +
+        `${r.hyperCapped && r.enableCapped ? ' and ' : ''}` +
+        `${r.enableCapped ? `~${fmt1(r.enableRaw)} weeks of enablement` : ''}. Treat both as floors.`);
+    }
+
+    const eRow = document.createElement('div');
+    eRow.className = 'legend-row concurrent';
+    eRow.innerHTML = `
+      <span class="legend-name">
+        <span class="swatch" style="background:${PHASE_COLORS.enable}"></span>
+        Enablement
+        <span class="tag">concurrent</span>
+      </span>
+      <span class="legend-weeks">~${fmt1(enablement)} wks <span class="aside">· ~${fmt1(r.enableCriticalPath)} of it on the critical path, drawn above</span></span>
+    `;
+    els.legend.appendChild(eRow);
+
+    // ---- assumptions copy, assembled from what is actually switched on ----
+    const widen = [];
+    if (r.experience === 'new') widen.push('a client team new to Snowflake');
+    if (r.isOnPrem) widen.push('an on-prem source');
+    if (r.regulated) widen.push('regulated data');
+    if (!r.measured) widen.push('no assessment behind the conversion term');
+    if (r.platform.variance) widen.push('the variance in a Databricks estate');
+
+    const paras = [];
+
+    paras.push({ text:
+      `Point estimate ~${fmt1(subtotal)} weeks — the figure the bar above is drawn to, segment for segment — ` +
+      `and it sits inside the band, not on its floor: low is 0.9× the estimate, high is ${highMult.toFixed(2)}×. ` +
+      `The high end widens with total scope` +
+      (widen.length ? `, and here also with ${widen.join(', ')}` : ` — and further with an inexperienced client team, an on-prem source, or regulated data`) +
+      `.` });
+
+    paras.push({ cls:'evidence', text:
+      `Evidence posture, plainly. Snowflake's documentation is an excellent inventory of what work exists and ` +
+      `publishes essentially no durations. What is doc-backed here is the shape of the work: PRIMARY KEY, UNIQUE ` +
+      `and FOREIGN KEY unenforced on standard tables with NOT NULL the exception, and the RELY behaviour; the ` +
+      `TIMESTAMP_LTZ, NUMBER(38,18), collation and empty-string conversion semantics; SnowConvert's coverage by ` +
+      `dialect and its conversion-rate metric; the edition feature gates; zero-copy clone; warehouses resizing with ` +
+      `ALTER and billing per second; and one published duration ratio — testing at 3–4× code conversion. ` +
+      `Everything that turns those facts into weeks is Sparq's judgment: by the calibration's own count, 29 of the ` +
+      `33 coefficients behind this model — rows 1–9, 11–14, 17–24 and 26–33 of its table — including every ` +
+      `per-source multiplier, every per-object rate, and both connectivity lead times, for which Snowflake ` +
+      `publishes nothing at all. The Fabric sibling of this tool was pressure-tested ` +
+      `against Microsoft Learn, which does publish throughput and guardrail numbers; this calibration has had no ` +
+      `equivalent external test. Read the phase shape as reasoned and the absolute weeks as a starting hypothesis.` });
+
+    paras.push({ text:
+      r.measured
+        ? `The conversion term is measured, not inferred. A SnowConvert assessment reports the percentage of source ` +
+          `code converted into functionally equivalent Snowflake code, counting anything carrying an EWI of medium ` +
+          `severity or higher as not converted — so at ${fmtInt(r.convRate * 100)}% the procedural work scales by ` +
+          `×${fmt2(r.procFactor)} and the ${r.platform.label} label falls back to ×${fmt2(r.srcApplied)} on the ` +
+          `remaining source-side work. That is the structural point of this revision: for a Snowflake target the ` +
+          `source platform is a weak proxy, because a free first-party tool will measure the actual driver on the ` +
+          `client's own code before anyone commits to a number. The label does keep one hold a conversion rate ` +
+          `cannot loosen: it scales the Build extract path at ×${fmt2(r.platform.buildMult)}, because how ` +
+          `convertible the code is says nothing about how hard the data is to get out.`
+        : `The source-platform multiplier is doing work it should not have to. With no assessment run, ` +
+          `${r.platform.label} carries ×${fmt2(r.platform.srcMult)} on source-side work and ×${fmt2(r.impliedFactor)} ` +
+          `on procedural conversion — an implied ~${fmtInt(r.platform.impliedRate * 100)}% conversion rate that is a ` +
+          `placeholder, not a finding. Snowflake publishes no typical conversion rates by platform; it publishes a ` +
+          `tool that measures yours. Run SnowConvert, enter the rate, and its weight on the rest of the source-side ` +
+          `wave work drops to ×${fmt2(1 + 0.4 * (r.platform.srcMult - 1))}. It would still scale the Build extract ` +
+          `path at ×${fmt2(r.platform.buildMult)}: that term answers how hard the data is to get out, which no ` +
+          `conversion rate speaks to.` });
+
+    paras.push({ text:
+      `That multiplier reaches source-side work only — units, tables, pipelines and procedural code. It does not ` +
+      `touch report work or BI-model repointing, because a Power BI model repointed at Snowflake is not harder ` +
+      `for the source having been Oracle; report and BI work sit in a separate stack that never carries the source ` +
+      `label. The Fabric sibling splits its stack the same way, so the two tools agree on this point — though the ` +
+      `coefficients on each side were calibrated separately and are not meant to match. What does make a model ` +
+      `harder is DirectQuery` +
+      (r.sso
+        ? `, and per-user SSO entitlement forces it — Entra ID SSO to Snowflake supports only DirectQuery, so all ` +
+          `${fmtInt(r.biModels)} model${r.biModels === 1 ? '' : 's'} price at ×1.8 and the warehouse and credit ` +
+          `design follows from a security requirement rather than a performance one.`
+        : `: ${r.dqModels > 0 ? `${fmtInt(r.dqModels)} of ${fmtInt(r.biModels)} models here` : 'none here'} carry ` +
+          `×1.8, and a per-user SSO entitlement requirement would force every one of them onto it.`) });
+
+    if (r.leadWeeks > 0){
+      const parts = [];
+      if (r.leadBase > 0) parts.push(`~${fmtInt(r.leadBase)} weeks for the account, network policy and rules, RBAC role model and service-user key-pair auth`);
+      if (r.privateLink) parts.push(`4 weeks for PrivateLink, because Snowflake hands over an identifier and the client's own network team creates the endpoint`);
+      if (r.sso) parts.push(`2 weeks for SSO and SCIM against an existing IdP`);
+      paras.push({ text:
+        `Provisioning is client-IT calendar, not Sparq effort: ${parts.join('; ')} — ~${fmtInt(r.leadWeeks)} weeks ` +
+        `in total. Snowflake publishes no lead time for PrivateLink approval, IdP integration or network change ` +
+        `control, so those two figures are Sparq's from delivery experience and are the items most likely to ` +
+        `dominate a regulated client's real calendar. It runs ` +
+        (r.leadAdd > 0
+          ? `alongside Assess, so only the ~${fmt1(r.leadAdd)} weeks that overhang Assess are drawn — nothing multiplies or divides them.`
+          : `alongside Assess and finishes inside it, so it adds no weeks of its own.`) });
+    }
+
+    paras.push({ text:
+      `Migration waves carry the conversion work — units, tables, pipelines, procedural code, reports and BI ` +
+      `models — across ${fmtInt(r.streams)} delivery stream${r.streams > 1 ? 's' : ''}` +
+      (r.streams > 1
+        ? `, and the split is sub-linear: crews contend for the same source extract windows, the same warehouses ` +
+          `and the same client approvers, so the divisor stops at 2.2×${r.streamDivCapped ? ' — which it has hit here' : ''}, ` +
+          `and each extra crew adds a quarter-week of coordination to Build.`
+        : `.`) +
+      ` Data volume adds only ~${fmt1(r.volTerm)} weeks: COPY INTO and Snowpipe run at minutes per terabyte, so ` +
+      `table count drives the work, not size. Every estate term is sublinear — the same object is cheaper the ` +
+      `hundredth time — and the two counts that scale furthest are also capped: the table term stops growing at ` +
+      `${fmtInt(r.TABLE_KNEE)} tables (~${fmt1(r.tableTerm)} weeks here) and the BI term at ${fmtInt(r.BI_KNEE)} ` +
+      `models (${fmt1(r.biCount)} models' worth here), because past those counts the work is a generated pass ` +
+      `over a template rather than a per-object job, and a per-object estimator has stopped being the right ` +
+      `instrument.` });
+
+    paras.push({ text:
+      `Validation and reconciliation is a phase of its own at ~${fmt1(r.recon)} weeks — proving the migrated data ` +
+      `matches source, which is not the same job as cleaning it. Snowflake does not enforce PRIMARY KEY, UNIQUE or ` +
+      `FOREIGN KEY on standard tables; NOT NULL is the exception. Duplicate and orphan rows therefore land ` +
+      `silently, and RELY — the property you set to recover join elimination — causes DML and CTAS statements to ` +
+      `write incorrect data when integrity is in fact violated. Reconciliation is a precondition for the ` +
+      `performance design, not hygiene. Four conversion semantics then need row-level rather than aggregate ` +
+      `comparison: TIMESTAMP_LTZ results depend on each session's TIMEZONE parameter, so unpinned sessions produce ` +
+      `drift that mimics data loss; Snowflake rounds where Teradata truncates and unqualified Oracle NUMBER becomes ` +
+      `NUMBER(38,18), shifting the last decimal of every derived measure while row counts and coarse aggregates ` +
+      `still agree; VARCHAR is case-sensitive by default, so a case-insensitive source legitimately changes join ` +
+      `and GROUP BY cardinality; and Oracle's empty-string-is-NULL equivalence is emulated by rewriting '' to ` +
+      `NULL, which the vendor states changes query results.` });
+
+    if (r.closeState === 'extends'){
+      paras.push({ text:
+        `Parallel run is calendar-bound: on a ${CLOSE_LABEL[r.closeCycle]} close cycle the window has to run both ` +
+        `systems side by side long enough to prove ${CLOSE_WINDOW[r.closeCycle]} — ~${fmt1(r.closeWeeks)} weeks of ` +
+        `it — and no number of crews shortens a calendar. The model assumes it begins 60% of the way through the ` +
+        `migration-wave phase, once enough is live to run against, so the last ~${fmt1(r.waveOverlap)} weeks of ` +
+        `wave work happen inside the window and only the ~${fmt1(r.parallelAdd)} weeks that continue past the end ` +
+        `of the waves are drawn as a band of their own. Keeping both systems in step through the window — CDC, ` +
+        `delta reconciliation, catch-up loads — is engineering, not just waiting: ~${fmt1(r.syncWork)} weeks of it ` +
+        `sit inside the wave phase.` });
+    } else if (r.closeState === 'absorbed'){
+      paras.push({ text:
+        `On a ${CLOSE_LABEL[r.closeCycle]} close cycle the parallel run still has to hold both systems side by side ` +
+        `long enough to prove ${CLOSE_WINDOW[r.closeCycle]} — a ~${fmt1(r.closeWeeks)}-week window. The model ` +
+        `assumes it begins 60% of the way through the migration-wave phase, and the ~${fmt1(r.waveOverlap)} weeks ` +
+        `of wave work still to run from that point are more than the window needs, so it adds no weeks of its own ` +
+        `— which is why no Parallel run band appears above. The ~${fmt1(r.syncWork)} weeks of sync work it takes ` +
+        `to hold both systems together are inside that wave figure.` });
+    } else if (r.closeState === 'noClose'){
+      paras.push({ text: `A parallel run is in effect, but with no close to tie off it adds no weeks of its own.` });
+    }
+
+    paras.push({ text:
+      `There is no capacity SKU here and no mis-sizing risk path, and that is the largest structural difference ` +
+      `from the Fabric sibling. Warehouses resize with a single ALTER, bill per second per cluster, and ` +
+      `auto-suspend and auto-resume, so guessing the size wrong produces a cost variance and a tuning ticket, not ` +
+      `a schedule slip. What can stop a wave is the edition — this estimate is on ${EDITIONS[r.edition].label} — ` +
+      `because Enterprise gates multi-cluster warehouses, materialized views, search optimization and row and ` +
+      `column-level security, and Business Critical gates PrivateLink and PHI under HIPAA and HITRUST with a signed ` +
+      `BAA. Those are contract terms, so the model raises them as warnings rather than pricing them as days.` });
+
+    const buildAdders = [];
+    if (r.regulated)       buildAdders.push('regulated control design +1.5');
+    if (r.zeroDowntime)    buildAdders.push('the zero-downtime switchover harness +0.75');
+    if (r.streams > 1)     buildAdders.push(`crew coordination +${fmtExact(0.25 * (r.streams - 1))}`);
+    if (r.editionAdd > 0)  buildAdders.push('Business Critical configuration +0.8');
+    if (r.byocAdd > 0)     buildAdders.push('the Openflow BYOC runtime +2.4');
+    if (r.finops)          buildAdders.push('credit governance +0.8 here and +0.5 in the waves during a parallel run');
+    if (r.sharing)         buildAdders.push('data sharing and listings +2.0');
+    if (r.regionAdd > 0)   buildAdders.push(`${r.region === 'crossCloud' ? 'a cross-cloud' : 'a multi-region'} footprint +${fmt1(r.regionAdd)}`);
+
+    paras.push({ text:
+      `Build is ~${fmt1(r.build)} weeks and it is not one number: ~${fmt1(r.buildTarget)} weeks of target-side ` +
+      `foundation` +
+      (buildAdders.length
+        ? ` — a ~1.5-week base plus ${buildAdders.join(', ')}`
+        : ` — a ~1.5-week base with nothing switched on above it`) +
+      `, ~${fmt1(r.buildSource)} weeks of source-side extract path scaled by the platform at ` +
+      `×${fmt2(r.platform.buildMult)}, and ~${fmt1(r.envWork)} weeks of environment setup. Nothing here moves with ` +
+      `dependency complexity or client fluency: it is Sparq's own work on the target.` });
+
+    paras.push({ text:
+      `Environments are the one place this model prices something as cheaper. Zero-copy clone hydrates each ` +
+      `environment after the first from the one before it — instantly, sharing the underlying storage, with no ` +
+      `additional cost until something is modified — so ` +
+      (r.environments === 1
+        ? `the single environment in scope costs ~${fmt1(r.envWork)} weeks of platform setup, and any second or ` +
+          `third would be hydrated from it at ×0.35 of that rather than built again`
+        : `${fmtInt(r.environments)} environments cost ~${fmt1(r.envWork)} weeks of platform setup instead of ` +
+          `~${fmt1(r.envNoClone)}, a saving of ~${fmt1(r.cloneSaving)} weeks`) +
+      `. Time Travel retention is set per environment inside that figure at a day or two each, and it is worth ` +
+      `deciding deliberately: retention drives storage cost, and zero days breaks clone-from-history. There is no ` +
+      `gateway term: BI tools connect to Snowflake directly, so there is nothing to install, size, cluster for HA ` +
+      `or patch.` +
+      (r.isOnPrem ? ` An on-prem source still needs an extract path near the data, which is the ~${fmt1(r.buildSource)} weeks priced in Build.` : ``) +
+      (r.byoc ? ` Openflow BYOC then adds a real gateway-shaped footprint on top, +2.4 weeks in Build — a VPC with ` +
+                `public and private subnets, a Network Load Balancer and an EKS cluster the client's platform team ` +
+                `has to own.` : ``) });
+
+    paras.push({ text:
+      r.finops
+        ? `Credit governance is a workstream here, not a footnote — budgets with a monthly limit and notifications, ` +
+          `resource monitors with a credit quota per interval, and the account and organisation usage views behind ` +
+          `them. Under a fixed-capacity platform cost is a procurement question settled once; Snowflake consumption ` +
+          `is unbounded by default, and backfill and parallel run are exactly the peak-spend windows.`
+        : `Credit governance is switched off in this scope. That is a live risk rather than a saving: Snowflake ` +
+          `consumption is unbounded by default, and backfill and parallel run are precisely when it spikes, with ` +
+          `no budget, resource monitor or usage view in place to see it happen.` });
+
+    paras.push({ text:
+      `Client fluency describes the client's team — Snowflake SQL, RBAC design and cost awareness, which a team ` +
+      `arriving from a fixed-capacity platform has no instinct for — so it prices the phases they actually pace, ` +
+      `validation, enablement and hypercare, in full, and gates wave sign-off at half strength. It does not scale ` +
+      `Build: the platform foundation is Sparq's own work. Enablement runs alongside pilot and waves — the band ` +
+      `under the bar is the whole effort — but only ~30% of it, ~${fmt1(r.enableCriticalPath)} weeks here, is work ` +
+      `the waves do not cover, so that much is charged to the critical path and drawn as the bar's closing segment.` });
+
+    els.assumptions.innerHTML = '';
+    paras.forEach(p => {
+      const para = document.createElement('p');
+      if (p.cls) para.className = p.cls;
+      para.textContent = p.text;
+      els.assumptions.appendChild(para);
+    });
+
+    // The one-sentence version, for the reader who cannot see the bar. Written
+    // only when it has actually changed, so a keystroke that moves nothing does
+    // not interrupt anyone.
+    const flagCount = els.flags.children.length;
+    const summary = `Estimate ${fmtInt(low)} to ${fmtInt(high)} weeks, point estimate about ` +
+      `${fmt1(subtotal)} weeks across ${phases.length} phases, ` +
+      (flagCount ? `with ${fmtInt(flagCount)} flag${flagCount === 1 ? '' : 's'} raised.` : `with no flags raised.`);
+    if (els.srSummary.textContent !== summary) els.srSummary.textContent = summary;
+  }
+
+  // The ruler's tick count and its label placement are both measured against the
+  // live track width and the live font, so both have to be redone when either
+  // changes.
+  let resizeTimer = null;
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(compute, 120);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(compute);
+
+  compute();
+</script>
+
+</body>
+</html>

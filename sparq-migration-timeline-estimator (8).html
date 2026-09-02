@@ -1,0 +1,1830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{color-scheme:light}
+  body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#D9D1CE;color:#16110F}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<title>Fabric Migration Timeline Estimator</title>
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<style>
+  :root{
+    color-scheme: light;
+
+    /* ---- Sparq brand — the original eight -------------------------- */
+    --brand-black:       #16110F;  /* near-black brown              */
+    --brand-espresso:    #231A17;  /* dark warm brown               */
+    --brand-pine:        #252D25;  /* green-black                   */
+    --brand-forest:      #3C4E3C;  /* deep green                    */
+    --brand-rust:        #732E1F;  /* deep rust                     */
+    --brand-terracotta:  #A23F2B;  /* terracotta                    */
+    --brand-stone:       #B8B0AD;  /* warm mid neutral              */
+    --brand-linen:       #D9D1CE;  /* warm light neutral            */
+
+    /* ---- Sparq brand — the remaining thirteen, read as ramps ------ */
+    /* ink: warm brown → warm grey */
+    --brand-bark:        #392E27;
+    --brand-umber:       #51453F;
+    --brand-taupe:       #71635C;
+    /* coral / terracotta */
+    --brand-coral:       #E75437;  /* the vivid signature           */
+    --brand-coral-mid:   #F0AB9D;
+    --brand-coral-pale:  #F9DDD8;
+    /* green */
+    --brand-sage:        #667E66;
+    --brand-sage-mid:    #ADC0AD;
+    --brand-sage-pale:   #D8DED8;
+    /* paper */
+    --brand-paper:       #EBE5E2;
+    --brand-paper-mid:   #F2ECEA;
+    --brand-paper-high:  #F9F7F5;
+    /* signal */
+    --brand-lime:        #B8F0A1;  /* the concurrent-work band       */
+
+    /* ---- roles: every one of these is an official brand value ---- */
+    /* the paper ramp, ordered: page → title sheet → cards → fields  */
+    --ground:         var(--brand-linen);       /* #D9D1CE */
+    --surface-raised: var(--brand-paper);       /* #EBE5E2 */
+    --surface:        var(--brand-paper-mid);   /* #F2ECEA */
+    --surface-input:  var(--brand-paper-high);  /* #F9F7F5 */
+    --surface-hover:  var(--brand-coral-pale);  /* #F9DDD8 — previews the coral selected state */
+
+    /* the ink ramp, one warm family                                 */
+    --ink:        var(--brand-black);   /* body + headings, 16.0:1 on card  */
+    --ink-meta:   var(--brand-bark);    /* mono eyebrows + labels, 11.3:1   */
+    --ink-hint:   var(--brand-taupe);   /* hint text, 4.9:1                 */
+    --ink-quiet:  var(--brand-umber);   /* ticks, note, footer, 6.1–7.9:1   */
+    --ink-invert: var(--brand-paper-high); /* type on dark fills            */
+
+    --accent:        var(--brand-coral); /* interactive state: 5.1:1 under --ink, 3.14:1 as a ring */
+    --accent-strong: var(--brand-rust);  /* the headline numeral, 8.4:1     */
+
+    --frame:       var(--brand-black);
+    --rule:        var(--brand-stone);
+    --rule-strong: var(--brand-taupe);
+    --grid:        var(--brand-stone);
+
+    /* ---- timeline phases (+ the ink that sits on each) ----------
+       Sequence validated with the data-viz palette validator against the
+       card surface (#F2ECEA), in every state the bar can render (with and
+       without the two conditional bands): worst adjacent pair is
+       parallel↔validation, ΔE 21.9 protan/deutan · 22.1 normal vision
+       (target ≥8 / ≥15). Every band is also direct-labelled and repeated in
+       the legend, so identity is never carried by colour alone.        */
+    --phase-provision:     var(--brand-taupe);        /* #71635C — label 5.4:1  */
+    --phase-provision-ink: var(--ink-invert);
+    --phase-assess:        var(--brand-stone);        /* #B8B0AD — label 8.8:1  */
+    --phase-assess-ink:    var(--brand-black);
+    --phase-build:         var(--brand-forest);       /* #3C4E3C — label 8.4:1  */
+    --phase-build-ink:     var(--ink-invert);
+    --phase-pilot:         var(--brand-coral-mid);    /* #F0AB9D — label 9.8:1  */
+    --phase-pilot-ink:     var(--brand-black);
+    --phase-waves:         var(--brand-terracotta);   /* #A23F2B — label 6.0:1  */
+    --phase-waves-ink:     var(--ink-invert);
+    --phase-recon:         var(--brand-sage-mid);     /* #ADC0AD — label 9.7:1  */
+    --phase-recon-ink:     var(--brand-black);
+    /* the one band under 4.5:1 — 4.2:1 is the best any brand ink reaches on
+       this fill, and it is direct-labelled, legended and hover-titled       */
+    --phase-parallel:      var(--brand-sage);         /* #667E66 — label 4.2:1  */
+    --phase-parallel-ink:  var(--brand-black);
+    --phase-hyper:         var(--brand-espresso);     /* #231A17 — label 16.0:1 */
+    --phase-hyper-ink:     var(--ink-invert);
+    /* concurrent, not a segment in the stack — reads as another kind of thing */
+    --phase-enable:        var(--brand-lime);         /* #B8F0A1 — label 14.3:1 */
+    --phase-enable-ink:    var(--brand-black);
+
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ground);}
+  body{
+    min-height:100vh;
+    color:var(--ink);
+    font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;
+    padding: 20px 14px 60px;
+  }
+
+  .sheet{
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .titleblock{
+    border: 1.5px solid var(--frame);
+    padding: 18px 18px 14px;
+    margin-bottom: 18px;
+    background: var(--surface-raised);
+    position: relative;
+  }
+  .titleblock::before{
+    content:"MIGRATION SCOPE — REV. E";
+    position:absolute;
+    top:-11px; left:14px;
+    background:var(--surface-raised);
+    padding:0 8px;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:0.12em;
+    color:var(--ink-quiet);
+  }
+  h1{
+    font-family:var(--font-sans);
+    font-weight:600;
+    font-size: clamp(21px, 4.6vw, 29px);
+    margin: 6px 0 4px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .sub{
+    font-family:var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-meta);
+    margin: 0;
+  }
+
+  .card{
+    border: 1.5px solid var(--frame);
+    background: var(--surface);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card-label{
+    font-family:var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-meta);
+    margin: 0 0 14px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .card-label::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background: var(--rule-strong);
+  }
+
+  /* ---- sub-sections inside the scope card ---------------------- */
+  .group + .group{ margin-top: 22px; }
+  .group-label{
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-hint);
+    margin: 0 0 12px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .group-label::after{
+    content:"";
+    flex:1;
+    border-top:1px dashed var(--rule);
+  }
+
+  .field{ margin-bottom: 16px; }
+  .field:last-child{ margin-bottom: 0; }
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    gap: 16px 18px;
+    align-items: start;
+  }
+  .grid .field{ margin-bottom: 0; }
+  .stack{
+    display:flex;
+    flex-direction:column;
+    gap: 14px;
+  }
+  .stack .field{ margin-bottom: 0; }
+
+  label{
+    display:block;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: var(--ink);
+  }
+  .hint{
+    font-family:var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--ink-hint);
+    display:block;
+    margin-top: 5px;
+  }
+
+  input[type="number"], select{
+    width: 100%;
+    font-family:var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    padding: 9px 10px;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-input);
+    color: var(--ink);
+  }
+  select{
+    appearance:none;
+    -webkit-appearance:none;
+    padding-right: 28px;
+    border-radius: 0;
+  }
+  input[type="number"]:focus, select:focus{
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  select:disabled{
+    color: var(--ink-hint);
+    background: var(--surface);
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+  .select-wrap{ position:relative; display:block; }
+  .select-wrap::after{
+    content:"";
+    position:absolute;
+    right: 11px;
+    top: 50%;
+    margin-top: -2px;
+    border-left: 4.5px solid transparent;
+    border-right: 4.5px solid transparent;
+    border-top: 5px solid var(--ink-meta);
+    pointer-events:none;
+  }
+
+  .segmented{
+    display:flex;
+    border: 1px solid var(--rule-strong);
+    overflow:hidden;
+  }
+  .segmented button{
+    flex:1;
+    font-family:var(--font-mono);
+    font-size: 12px;
+    padding: 9px 6px;
+    background: var(--surface-input);
+    border: none;
+    border-right: 1px solid var(--rule-strong);
+    color: var(--ink);
+    cursor:pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .segmented button:last-child{ border-right:none; }
+  .segmented button:hover{ background: var(--surface-hover); }
+  .segmented button.active{
+    background: var(--accent);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: inset 0 -3px 0 var(--frame);
+  }
+  .segmented button:focus-visible{
+    outline: 2px solid var(--frame);
+    outline-offset: -2px;
+  }
+  /* locked: same dashed-outline idiom the locked toggles and selects use */
+  .segmented.locked{ border-style: dashed; }
+  .segmented button:disabled{
+    color: var(--ink-hint);
+    background: var(--surface);
+    cursor: not-allowed;
+  }
+  .segmented button:disabled:hover{ background: var(--surface); }
+  .segmented button:disabled.active{
+    background: var(--surface-hover);
+    color: var(--ink-hint);
+    box-shadow: inset 0 -3px 0 var(--rule-strong);
+  }
+
+  /* ---- toggles: the same square, hard-edged idiom as the segments -- */
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 12px;
+    border-top: 1px dashed var(--rule);
+    padding-top: 12px;
+  }
+  .toggle-row label{ margin:0; }
+  .toggle-copy{ min-width:0; }
+  .toggle-copy .hint{ margin-top: 3px; }
+  /* 40x24: the 24px height is the WCAG 2.2 target-size minimum, and the knob
+     geometry below is re-derived from it rather than left at the old 20px box.
+     The text label stays a working alternate target for the same input. */
+  .switch{
+    position:relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 24px;
+    display:block;
+  }
+  .switch input{
+    position:absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .switch .track{
+    position:absolute;
+    inset: 0;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-input);
+    transition: background 0.15s ease;
+  }
+  .switch .knob{
+    position:absolute;
+    top: 4px; left: 4px;
+    width: 16px; height: 16px;
+    background: var(--rule-strong);
+    transition: left 0.15s ease, background 0.15s ease;
+  }
+  /* The input is transparent and sits UNDER the track and knob in paint order,
+     so without this the visible switch swallows every click and only the text
+     label or the keyboard actually toggles it. */
+  .switch .track,
+  .switch .knob{ pointer-events: none; }
+  .switch input:checked ~ .track{ background: var(--accent); }
+  .switch input:checked ~ .knob{ left: 20px; background: var(--frame); }
+  .switch input:focus-visible ~ .track{
+    outline: 2px solid var(--frame);
+    outline-offset: 2px;
+  }
+  .switch input:disabled{ cursor: not-allowed; }
+  .switch input:disabled ~ .track{ border-style: dashed; }
+  .switch input:disabled ~ .knob{ background: var(--ink-hint); }
+  .locknote{
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-hint);
+    display:block;
+    margin-top: 4px;
+  }
+  .locknote[hidden]{ display:none; }
+
+  /* Announced, not drawn: the role="status" summary that gives a screen reader
+     the whole answer in one line instead of eight paragraphs of assumptions. */
+  .sr-only{
+    position:absolute;
+    width:1px; height:1px;
+    margin:-1px; padding:0;
+    overflow:hidden;
+    clip-path: inset(50%);
+    white-space:nowrap;
+    border:0;
+  }
+
+  .result-headline{
+    text-align:center;
+    padding: 6px 0 18px;
+  }
+  .result-headline .range{
+    font-family:var(--font-sans);
+    font-weight:600;
+    font-size: clamp(34px, 10vw, 52px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--accent-strong);
+    line-height: 1;
+  }
+  .result-headline .unit{
+    font-family:var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform:uppercase;
+    color: var(--ink-quiet);
+    margin-top: 8px;
+  }
+
+  .ruler{
+    position: relative;
+    height: 20px;
+    margin: 0 0 2px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .ruler span{
+    position:absolute;
+    bottom: 4px;
+    transform: translateX(-50%);
+    font-family:var(--font-mono);
+    font-size: 9.5px;
+    white-space: nowrap;
+    color: var(--ink-quiet);
+  }
+  .ruler i{
+    position:absolute;
+    bottom: 0;
+    width:1px;
+    height: 6px;
+    background: var(--rule-strong);
+  }
+
+  .timeline{
+    display:flex;
+    width: 100%;
+    height: 46px;
+    border: 1px solid var(--frame);
+    background: var(--surface);
+    overflow:hidden;
+  }
+  .phase{
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    border-right: 2px solid var(--surface);
+    min-width: 2px;
+  }
+  .phase:last-child{ border-right:none; }
+  .phase-label{
+    font-family:var(--font-mono);
+    color: var(--ink-invert);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 4px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* ---- the concurrent band: under the bar, not in the stack ------ */
+  .overlay-track{
+    position:relative;
+    height: 24px;
+    margin-top: 3px;
+  }
+  .overlay-band{
+    position:absolute;
+    top: 0;
+    height: 20px;
+    background: var(--phase-enable);
+    border: 1px solid var(--frame);
+    border-top-style: dashed;
+    display:flex;
+    align-items:center;
+    min-width: 2px;
+  }
+  .overlay-band .phase-label{ color: var(--phase-enable-ink); }
+  .overlay-aside{
+    position:absolute;
+    top: 3px;
+    left: var(--aside-left, 0px);
+    right: 0;
+    font-family:var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-quiet);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .legend{
+    display:grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .legend-row{
+    display:flex;
+    flex-wrap: wrap;
+    align-items:baseline;
+    justify-content:space-between;
+    gap: 4px 10px;
+    font-size: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .legend-row:last-child{ border-bottom:none; padding-bottom:0; }
+  .legend-row.concurrent{ border-bottom:none; padding-bottom:0; }
+  .legend-name{
+    display:flex;
+    flex-wrap: wrap;
+    min-width: 0;
+    align-items:center;
+    gap: 8px;
+  }
+  .legend-name .tag{
+    font-family:var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-hint);
+    border: 1px solid var(--rule);
+    padding: 1px 4px;
+  }
+  .swatch{
+    width: 10px; height: 10px;
+    flex: 0 0 auto;
+    display:inline-block;
+    border: 1px solid var(--frame);
+  }
+  .legend-weeks{
+    font-family:var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--ink);
+    margin-left: auto;
+  }
+  .legend-weeks .aside{ color: var(--ink-hint); }
+  /* a parallel run whose close the wave phase absorbs: a real input with no
+     band of its own, so its row is drawn but visibly unfilled */
+  .legend-row.absorbed .swatch{ opacity: 0.4; }
+  .legend-row.absorbed .legend-weeks{ color: var(--ink-hint); }
+
+  /* ---- flags: things the model held back or wants to warn about ----- */
+  .flags{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .flags:empty{ display:none; }
+  .flag{
+    display:flex;
+    gap: 10px;
+    align-items: baseline;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-raised);
+    padding: 9px 11px;
+  }
+  .flag.warn{
+    border-color: var(--accent);
+    background: var(--surface-hover);
+  }
+  .flag-tag{
+    font-family:var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-meta);
+    border: 1px solid var(--rule);
+    padding: 1px 4px;
+    flex: 0 0 auto;
+  }
+  .flag p{
+    margin: 0;
+    font-family:var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--ink-quiet);
+  }
+
+  .note{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    font-family:var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: var(--ink-quiet);
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+  .note p{ margin: 0; }
+
+  .excluded{
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--rule);
+  }
+  .excluded p{
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-meta);
+    margin: 0 0 8px;
+  }
+  .excluded ul{
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+    gap: 6px 18px;
+  }
+  .excluded li{
+    font-family:var(--font-mono);
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--ink-quiet);
+    padding-left: 14px;
+    position:relative;
+  }
+  .excluded li::before{
+    content:"×";
+    position:absolute;
+    left: 0;
+    color: var(--ink-hint);
+  }
+
+  .footer-mark{
+    text-align:center;
+    font-family:var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--ink-quiet);
+    margin-top: 22px;
+  }
+
+  /* narrow screens: the concurrent caption drops under its band instead of
+     running off the sheet */
+  @media (max-width: 560px){
+    .overlay-track{ height: 42px; }
+    .overlay-aside{ left: 0; top: 24px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .phase{ transition: width 0.35s ease; }
+    .overlay-band{ transition: width 0.35s ease, left 0.35s ease; }
+    .range{ transition: opacity 0.2s ease; }
+  }
+</style>
+
+<div class="sheet" lang="en">
+
+  <div class="titleblock">
+    <h1>Fabric Migration Timeline Estimator</h1>
+    <p class="sub">Scope inputs → phased duration, in weeks</p>
+  </div>
+
+  <div class="card">
+    <p class="card-label">01 — Scope</p>
+
+    <div class="group">
+      <p class="group-label">Estate</p>
+      <div class="grid">
+        <div class="field">
+          <label for="units">Migration units</label>
+          <input type="number" id="units" min="1" max="10000" step="1" value="4" aria-describedby="unitsHint">
+          <span class="hint" id="unitsHint">one warehouse or lakehouse domain, or one coherent report pack sharing a semantic model</span>
+        </div>
+        <div class="field">
+          <label for="reports">Reports</label>
+          <input type="number" id="reports" min="0" max="100000" step="1" value="40" aria-describedby="reportsHint">
+          <span class="hint" id="reportsHint">distinct from units — every report to rebuild or repoint</span>
+        </div>
+        <div class="field">
+          <label for="dlModels">Semantic models → Direct Lake</label>
+          <input type="number" id="dlModels" min="0" max="100000" step="1" value="3" aria-describedby="dlModelsHint">
+          <span class="hint" id="dlModelsHint">sublinear across the estate — pattern libraries make the tenth model cheaper than the first — and it stops growing at 60</span>
+        </div>
+        <div class="field">
+          <label for="importModels">Semantic models staying Import</label>
+          <input type="number" id="importModels" min="0" max="100000" step="1" value="0" aria-describedby="importModelsHint">
+          <span class="hint" id="importModelsHint">repointed rather than rebuilt, so each one prices well below a Direct Lake conversion — but not at nothing, in the waves and in validation alike; tapered like the Direct Lake count, and it stops growing at 60</span>
+        </div>
+        <div class="field">
+          <label for="tables">Tables</label>
+          <input type="number" id="tables" min="0" max="1000000" step="1" value="200" aria-describedby="tablesHint">
+          <span class="hint" id="tablesHint">the real volume proxy — conversion work tracks table count, not terabytes; sublinear, and it stops growing at 6,000 tables</span>
+        </div>
+        <div class="field">
+          <label for="pipelines">Pipelines</label>
+          <input type="number" id="pipelines" min="0" max="1000000" step="1" value="25" aria-describedby="pipelinesHint">
+          <span class="hint" id="pipelinesHint">ADF / Synapse pipelines to convert — the first one carries a fixed per-environment rework charge</span>
+        </div>
+        <div class="field">
+          <label for="sourceSystems">Source systems</label>
+          <input type="number" id="sourceSystems" min="1" max="1000" step="1" value="2" aria-describedby="sourceSystemsHint">
+          <span class="hint" id="sourceSystemsHint">the quietest expensive field on the page — each system past the first adds about 1.4 weeks at default settings, spread across Assess (0.4), Build (0.5, then scaled by the source platform) and Validation (0.5, then by the validation stack)</span>
+        </div>
+        <div class="field">
+          <label for="volume">Data volume (TB)</label>
+          <input type="number" id="volume" min="0" max="1000000" step="1" value="8" aria-describedby="volumeHint">
+          <span class="hint" id="volumeHint">barely moves the estimate — bulk load runs at minutes per terabyte</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Platform</p>
+      <div class="stack">
+        <div class="field">
+          <label for="platform">Source platform</label>
+          <span class="select-wrap">
+            <select id="platform" aria-describedby="platformHint">
+              <option value="pbi">Power BI Premium (P → F SKU)</option>
+              <option value="databricks">Databricks (coexist via UC mirroring)</option>
+              <option value="synapseSql" selected>Synapse dedicated SQL → Warehouse</option>
+              <option value="adf">ADF / Synapse pipelines</option>
+              <option value="synapseSpark">Synapse Spark → Lakehouse</option>
+              <option value="onpremSql">On-prem SQL Server</option>
+              <option value="onpremOracle">On-prem Oracle</option>
+            </select>
+          </span>
+          <span class="hint" id="platformHint">the path out of here — source-side conversion runs ×0.35 for a P-to-F SKU move against ×1.45 for an Oracle lift, about 4× apart; it also rescales the whole Build foundation, and it does not price the report and Direct Lake work, which is built on Fabric either way</span>
+        </div>
+
+        <div class="field">
+          <label id="capacitySkuLabel">Target capacity</label>
+          <div class="segmented" id="capacitySku" data-value="f64" role="radiogroup"
+               aria-labelledby="capacitySkuLabel" aria-describedby="skuNote skuHint">
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="small">F2–F32</button>
+            <button type="button" role="radio" aria-checked="true"  tabindex="0"  data-val="f64" class="active">F64</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="large">F128+</button>
+          </div>
+          <span class="locknote" id="skuNote" hidden>no effect — no semantic models in scope</span>
+          <span class="hint" id="skuHint">Direct Lake guardrails are per SKU — F2–F32 caps at 300M rows per table and 3–10 GB of model memory; 1.5bn rows needs F64/P1 or above. The SKU also prices the whole semantic-model term: ×1.4 on F2–F32, where the work is likelier to be redone, ×1.0 on F64, and ×0.9 on F128+ for the headroom it buys back</span>
+        </div>
+
+        <div class="field">
+          <label for="dlShape">Direct Lake model shape</label>
+          <span class="select-wrap">
+            <select id="dlShape" aria-describedby="dlShapeNote dlShapeHint">
+              <option value="clean">Clean star schema (repoint)</option>
+              <option value="mixed" selected>Mixed</option>
+              <option value="heavy">Heavy rework (calculated columns, views, composite)</option>
+            </select>
+          </span>
+          <span class="locknote" id="dlShapeNote" hidden>no effect — no models moving to Direct Lake</span>
+          <span class="hint" id="dlShapeHint">calculated columns and tables, binary/GUID types, user hierarchies and composite models are rebuilds, not repoints — this prices the Direct Lake count only, never the models staying on Import</span>
+        </div>
+
+        <div class="toggle-row" id="gatewayRow">
+          <span class="toggle-copy">
+            <label for="gateway">On-prem gateway required</label>
+            <span class="locknote" id="gatewayNote" hidden>on automatically — source is on-prem</span>
+            <span class="hint" id="gatewayHint">adds 1.0 week to the Build foundation — gateway cluster, credentials and network path — before the source platform rescales it</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="gateway" aria-describedby="gatewayNote gatewayHint">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="regulated">Regulated data</label>
+            <span class="hint" id="regulatedHint">adds control design in Build, evidence in the waves, a heavier Validation phase, and a longer hypercare tail</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="regulated" aria-describedby="regulatedHint">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Delivery</p>
+      <div class="stack">
+        <div class="field">
+          <label for="provisioning">Provisioning lead time</label>
+          <span class="select-wrap">
+            <select id="provisioning" aria-describedby="provisioningHint">
+              <option value="none">Already provisioned (0)</option>
+              <option value="standard" selected>Standard (3 weeks)</option>
+              <option value="slow">Slow client IT (8 weeks)</option>
+            </select>
+          </span>
+          <span class="hint" id="provisioningHint">capacity, private networking, Entra and workspace identity, RLS/OLS — client-IT calendar, not Sparq effort; it runs alongside Assess</span>
+        </div>
+
+        <div class="field">
+          <label id="complexityLabel">Dependency complexity</label>
+          <div class="segmented" id="complexity" data-value="medium" role="radiogroup"
+               aria-labelledby="complexityLabel" aria-describedby="complexityHint">
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="low">Low</button>
+            <button type="button" role="radio" aria-checked="true"  tabindex="0"  data-val="medium" class="active">Medium</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="high">High</button>
+          </div>
+          <span class="hint" id="complexityHint">stored procs, RBAC, dbt models, and downstream BI touching this data</span>
+        </div>
+
+        <div class="field">
+          <label id="experienceLabel">Client team's Fabric fluency</label>
+          <div class="segmented" id="experience" data-value="some" role="radiogroup"
+               aria-labelledby="experienceLabel" aria-describedby="experienceHint">
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="new">New to it</button>
+            <button type="button" role="radio" aria-checked="true"  tabindex="0"  data-val="some" class="active">Some reps</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="fluent">Fluent</button>
+          </div>
+          <span class="hint" id="experienceHint">the client's own team, not Sparq's — it prices validation, enablement and hypercare in full, gates wave sign-off at half strength, and leaves Sparq's build work alone</span>
+        </div>
+
+        <div class="field">
+          <label id="streamsLabel">Delivery streams</label>
+          <div class="segmented" id="streams" data-value="1" role="radiogroup"
+               aria-labelledby="streamsLabel" aria-describedby="streamsHint">
+            <button type="button" role="radio" aria-checked="true"  tabindex="0"  data-val="1" class="active">1</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="2">2</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="3">3</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="4">4</button>
+          </div>
+          <span class="hint" id="streamsHint">parallel crews — the wave and validation split is sub-linear and capped at 2.2×; each crew adds coordination to build</span>
+        </div>
+
+        <div class="field">
+          <label id="dqDebtLabel">Data quality debt</label>
+          <div class="segmented" id="dqDebt" data-value="low" role="radiogroup"
+               aria-labelledby="dqDebtLabel" aria-describedby="dqDebtHint">
+            <button type="button" role="radio" aria-checked="true"  tabindex="0"  data-val="low" class="active">Low</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="medium">Medium</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-val="high">High</button>
+          </div>
+          <span class="hint" id="dqDebtHint">how much the source data argues with itself — it compounds on both wave stacks and on validation: ×1.00 low, ×1.10 medium, ×1.25 high</span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-copy">
+            <label for="zeroDowntime">Zero-downtime cutover</label>
+            <span class="hint" id="zeroDowntimeHint">forces a parallel run — old and new stay live together — and adds a 0.75-week switchover harness to Build, before the source platform rescales it</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="zeroDowntime" aria-describedby="zeroDowntimeHint">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="toggle-row" id="parallelRow">
+          <span class="toggle-copy">
+            <label for="parallelRun">Parallel run</label>
+            <span class="locknote" id="parallelNote" hidden>on automatically — zero-downtime cutover</span>
+            <span class="hint" id="parallelRunHint">holds the old and new systems side by side until one full close cycle has been proven on Fabric</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="parallelRun" aria-describedby="parallelNote parallelRunHint">
+            <span class="track"></span>
+            <span class="knob"></span>
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="closeCycle">Longest close cycle</label>
+          <span class="select-wrap">
+            <select id="closeCycle" disabled aria-describedby="closeHint">
+              <option value="none">No close to tie off</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+          </span>
+          <span class="hint" id="closeHint">turn on parallel run to set this — the close cycle is what the parallel run has to cover</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">02 — Estimate</p>
+
+    <div class="result-headline">
+      <div class="range" id="rangeOut" aria-live="polite">—</div>
+      <div class="unit">weeks, provisioning through hypercare</div>
+    </div>
+    <p class="sr-only" role="status" id="srSummary"></p>
+
+    <div class="ruler" id="ruler"></div>
+    <div class="timeline" id="timeline"></div>
+    <div class="overlay-track" id="overlayTrack"></div>
+
+    <div class="flags" id="flags"></div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="note" id="assumptions"></div>
+
+    <div class="excluded">
+      <p>Excluded</p>
+      <ul>
+        <li>Data quality remediation — fixing bad source data, as distinct from proving parity, which the validation phase covers</li>
+        <li>Source-system decommissioning</li>
+        <li>Net-new feature development</li>
+        <li>License or capacity cost</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-mark">planning estimate — not a quote; re-run after assessment</div>
+
+</div>
+
+<script>
+  const els = {
+    units: document.getElementById('units'),
+    reports: document.getElementById('reports'),
+    dlModels: document.getElementById('dlModels'),
+    importModels: document.getElementById('importModels'),
+    tables: document.getElementById('tables'),
+    pipelines: document.getElementById('pipelines'),
+    sourceSystems: document.getElementById('sourceSystems'),
+    volume: document.getElementById('volume'),
+    platform: document.getElementById('platform'),
+    capacitySku: document.getElementById('capacitySku'),
+    skuNote: document.getElementById('skuNote'),
+    dlShape: document.getElementById('dlShape'),
+    dlShapeNote: document.getElementById('dlShapeNote'),
+    provisioning: document.getElementById('provisioning'),
+    gateway: document.getElementById('gateway'),
+    gatewayNote: document.getElementById('gatewayNote'),
+    regulated: document.getElementById('regulated'),
+    complexity: document.getElementById('complexity'),
+    experience: document.getElementById('experience'),
+    streams: document.getElementById('streams'),
+    dqDebt: document.getElementById('dqDebt'),
+    zeroDowntime: document.getElementById('zeroDowntime'),
+    parallelRun: document.getElementById('parallelRun'),
+    parallelNote: document.getElementById('parallelNote'),
+    closeCycle: document.getElementById('closeCycle'),
+    closeHint: document.getElementById('closeHint'),
+    rangeOut: document.getElementById('rangeOut'),
+    srSummary: document.getElementById('srSummary'),
+    ruler: document.getElementById('ruler'),
+    timeline: document.getElementById('timeline'),
+    overlayTrack: document.getElementById('overlayTrack'),
+    flags: document.getElementById('flags'),
+    legend: document.getElementById('legend'),
+    assumptions: document.getElementById('assumptions'),
+  };
+
+  // Source platform sets two independent multipliers: how much foundation the
+  // platform needs (buildMult) and how hard the source-side conversion work is
+  // (waveMult). waveMult reaches units, tables and pipelines ONLY — never the
+  // report and Direct Lake work, which is built on Fabric and priced by Fabric.
+  const PLATFORMS = {
+    pbi:          { label:'Power BI Premium (P → F SKU)',  buildMult:0.6, waveMult:0.35, onPrem:false },
+    databricks:   { label:'Databricks (UC mirroring)',      buildMult:0.8, waveMult:0.50, onPrem:false },
+    synapseSql:   { label:'Synapse dedicated SQL',          buildMult:1.0, waveMult:1.00, onPrem:false },
+    adf:          { label:'ADF / Synapse pipelines',        buildMult:1.1, waveMult:1.00, onPrem:false },
+    synapseSpark: { label:'Synapse Spark → Lakehouse',      buildMult:1.0, waveMult:1.15, onPrem:false },
+    onpremSql:    { label:'On-prem SQL Server',             buildMult:1.4, waveMult:1.30, onPrem:true  },
+    onpremOracle: { label:'On-prem Oracle',                 buildMult:1.6, waveMult:1.45, onPrem:true  },
+  };
+
+  // One ceiling for every compounding soft-factor product in the model. REV. C
+  // set it at 2.5x and applied it to the wave stack alone, where it engaged in
+  // exactly 1 of the 126 combinations of source platform, client fluency,
+  // data-quality debt and regulated flag — while Validation carried the same
+  // compounding factors with no ceiling at all and reached 2.50x unchecked.
+  // 2.0x engages on the extreme tail of that space (about 8% of combinations on
+  // the source side, 11% on Validation, 15% on at least one of the two) and
+  // leaves every mid-range estate exactly where it was.
+  const STACK_CAP = 2.0;
+
+  // ---- estate taper -----------------------------------------------------
+  // Table count and semantic-model count were the only strictly linear estate
+  // terms left in the model — every other one carries an exponent of 0.72–0.85 —
+  // and linear terms are what let a very large estate print an indefensible
+  // total. Both now run sublinear with a hard knee, and the same effective
+  // counts drive validation, so a count behaves the same way wherever it appears.
+  //
+  // The coefficients are set so the curve passes THROUGH the old linear values
+  // across the mid-market band rather than sagging below it: a 200-table
+  // departmental estate lands +2.7% and a 2,000-table mid-market estate -4.5%
+  // against REV. C. The knees are where item-by-item conversion stops being how
+  // the work is actually done.
+  const TABLE_KNEE = 6000;   // past here, conversion is a generated, metadata-driven factory
+  const MODEL_KNEE = 60;     // past here, the estate is a model factory, not 60 one-off builds
+  const TABLE_COEF = 1.9059, TABLE_EXP = 0.90;
+  const MODEL_COEF = 1.2272, MODEL_EXP = 0.90;
+  const effTables = t => t > 0 ? TABLE_COEF * Math.pow(Math.min(t, TABLE_KNEE), TABLE_EXP) : 0;
+  const effModels = m => m > 0 ? MODEL_COEF * Math.pow(Math.min(m, MODEL_KNEE), MODEL_EXP) : 0;
+
+  // Each segmented control is a radiogroup, not a row of unrelated buttons:
+  // role and aria-checked are maintained in setSegmented — the single place the
+  // active option is ever set — so the announced state can never drift from the
+  // painted one. tabindex is roving, so the whole group is one tab stop.
+  const segButtons = container => [...container.querySelectorAll('button')];
+
+  function chooseSegment(container, btn, focus){
+    if (!btn || btn.disabled) return;
+    setSegmented(container, btn.dataset.val);
+    if (container === els.capacitySku) manual.sku = container.dataset.value;
+    if (focus) btn.focus();
+    compute();
+  }
+
+  function setupSegmented(container){
+    segButtons(container).forEach(btn => {
+      // click covers pointer, and — because these are real <button>s — Space
+      // and Enter as well, which keeps working alongside the arrow keys.
+      btn.addEventListener('click', () => chooseSegment(container, btn, false));
+    });
+
+    // Arrow keys move focus AND selection, wrapping at both ends, over the
+    // enabled options only; Home/End jump to the first and last. Anything else
+    // falls through untouched, so Tab still leaves the group and nothing traps.
+    container.addEventListener('keydown', e => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const btns = segButtons(container).filter(b => !b.disabled);
+      if (!btns.length) return;
+      const cur = btns.indexOf(document.activeElement);
+      let next;
+      switch (e.key){
+        case 'ArrowLeft':
+        case 'ArrowUp':    next = cur <= 0 ? btns.length - 1 : cur - 1; break;
+        case 'ArrowRight':
+        case 'ArrowDown':  next = cur < 0 ? 0 : (cur + 1) % btns.length; break;
+        case 'Home':       next = 0; break;
+        case 'End':        next = btns.length - 1; break;
+        default: return;
+      }
+      e.preventDefault();
+      chooseSegment(container, btns[next], true);
+    });
+  }
+  function setSegmented(container, val){
+    segButtons(container).forEach(b => {
+      const on = b.dataset.val === val;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+    container.dataset.value = val;
+  }
+  [els.complexity, els.experience, els.streams, els.dqDebt, els.capacitySku]
+    .forEach(setupSegmented);
+
+  const COUNT_FIELDS = ['units','reports','dlModels','importModels','tables','pipelines','sourceSystems','volume'];
+  COUNT_FIELDS.forEach(k => els[k].addEventListener('input', compute));
+
+  // The min and max attributes in the markup are the single source of truth for
+  // each field's range: the browser reflects them, num() clamps the maths to
+  // them, and this puts an out-of-range field back inside them on commit
+  // (change / blur) only — never mid-keystroke, so a value being typed is left
+  // alone and the caret never jumps. It normalises in BOTH directions, and
+  // resolves a blank or unparseable field to the same floor the maths uses, so
+  // the number on screen is always the number the estimate was computed on.
+  // Every one of these counts is a whole thing — you cannot migrate 4.5 units or
+  // half a source system — so the commit also snaps to the field's own step.
+  // Without it a pasted or spun 4.5 was quietly priced as 4.5 with nothing on
+  // screen to say so; now the field visibly becomes 5 and the estimate is
+  // recomputed on the value actually shown.
+  COUNT_FIELDS.forEach(k => els[k].addEventListener('change', () => {
+    const el = els[k];
+    const lo = floorOf(el), hi = limitOf(el);
+    const step = parseFloat(el.getAttribute('step'));
+    const v = parseFloat(el.value);
+    let normalised = !Number.isFinite(v) ? lo : Math.min(hi, Math.max(lo, v));
+    if (Number.isFinite(step) && step > 0){
+      normalised = Math.min(hi, Math.max(lo, lo + Math.round((normalised - lo) / step) * step));
+    }
+    if (String(normalised) !== el.value){
+      el.value = String(normalised);
+      compute();   // the printed estimate must never lag the printed input
+    }
+  }));
+
+  // The user's own last manual setting for the two toggles that can be forced
+  // on from elsewhere. A forced toggle is a display state over this value, not
+  // a replacement for it, so releasing the force restores exactly what the user
+  // chose and the estimate stops depending on the order things were clicked.
+  const manual = { gateway: els.gateway.checked, parallelRun: els.parallelRun.checked,
+                   sku: els.capacitySku.dataset.value, dlShape: els.dlShape.value };
+  els.dlShape.addEventListener('change', () => {
+    if (!els.dlShape.disabled) manual.dlShape = els.dlShape.value;
+  });
+  els.gateway.addEventListener('change', () => {
+    if (!els.gateway.disabled) manual.gateway = els.gateway.checked;
+  });
+  els.parallelRun.addEventListener('change', () => {
+    if (!els.parallelRun.disabled) manual.parallelRun = els.parallelRun.checked;
+  });
+  [els.platform, els.dlShape, els.provisioning, els.gateway, els.regulated,
+   els.zeroDowntime, els.parallelRun, els.closeCycle]
+    .forEach(el => el.addEventListener('change', compute));
+
+  // Fills and the ink that rides on them both come from :root custom properties.
+  const PHASE_COLORS = {
+    provision:'var(--phase-provision)',
+    assess:   'var(--phase-assess)',
+    build:    'var(--phase-build)',
+    pilot:    'var(--phase-pilot)',
+    waves:    'var(--phase-waves)',
+    recon:    'var(--phase-recon)',
+    parallel: 'var(--phase-parallel)',
+    hyper:    'var(--phase-hyper)',
+    enable:   'var(--phase-enable)',
+    enableCp: 'var(--phase-enable)',
+  };
+
+  const PHASE_LABEL_INK = {
+    provision:'var(--phase-provision-ink)',
+    assess:   'var(--phase-assess-ink)',
+    build:    'var(--phase-build-ink)',
+    pilot:    'var(--phase-pilot-ink)',
+    waves:    'var(--phase-waves-ink)',
+    recon:    'var(--phase-recon-ink)',
+    parallel: 'var(--phase-parallel-ink)',
+    hyper:    'var(--phase-hyper-ink)',
+    enable:   'var(--phase-enable-ink)',
+    enableCp: 'var(--phase-enable-ink)',
+  };
+
+  // Every count is read through this: blank, junk, negative, or absurd can
+  // never reach the maths — so no NaN, no negative range, and no input large
+  // enough to turn the estimate (or the ruler) into nonsense.
+  function limitOf(el){
+    const m = parseFloat(el.getAttribute('max'));
+    return Number.isFinite(m) ? m : Infinity;
+  }
+  function floorOf(el){
+    const m = parseFloat(el.getAttribute('min'));
+    return Number.isFinite(m) ? m : -Infinity;
+  }
+
+  // Week counts are printed all over the page and the estate can legitimately
+  // run to five, six or seven figures, so every printed count goes through one
+  // of these: four figures and up get thousands separators, everything else is
+  // unchanged.
+  function fmtInt(n){
+    return Math.round(n).toLocaleString('en-US');
+  }
+  function fmt1(n){
+    return n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  }
+  function fmt2(n){
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function num(el, min){
+    const v = parseFloat(el.value);
+    if (!Number.isFinite(v)) return min;
+    return Math.min(limitOf(el), Math.max(min, v));
+  }
+
+  // Forced on means shown as on and locked, while the user's own value waits in
+  // `manual` and is put back the moment the force lifts. Idempotent, so it holds
+  // through any number of switches in either direction.
+  function setForced(input, note, forced, manualValue){
+    input.checked = forced ? true : manualValue;
+    input.disabled = forced;
+    note.hidden = !forced;
+  }
+
+  // Interlocks that hold whatever order the user clicks things in.
+  function syncLocks(){
+    const platform = PLATFORMS[els.platform.value] || PLATFORMS.synapseSql;
+
+    // An on-prem source cannot be reached without a gateway, so it is forced on
+    // and locked — over the top of the user's own setting, never instead of it.
+    setForced(els.gateway, els.gatewayNote, platform.onPrem, manual.gateway);
+
+    // Zero-downtime means both systems stay live: a parallel run is the mechanism.
+    setForced(els.parallelRun, els.parallelNote, els.zeroDowntime.checked, manual.parallelRun);
+
+    // A parallel run is in effect whether the user toggled it or zero-downtime
+    // forced it. Either way the close cycle is a live input that moves the
+    // estimate, so it stays editable — it is only meaningless when no parallel
+    // run applies at all.
+    const parallelInEffect = els.zeroDowntime.checked || els.parallelRun.checked;
+    els.closeCycle.disabled = !parallelInEffect;
+    els.closeHint.textContent = parallelInEffect
+      ? 'the parallel run has to survive one full close of this length'
+      : 'turn on parallel run to set this — the close cycle is what the parallel run has to cover';
+
+    // Capacity SKU and Direct Lake model shape both reach the maths through the
+    // semantic-model term, but they do NOT reach the same part of it, so they
+    // cannot share a lock condition.
+    //
+    // The capacity multiplier scales the whole term — Direct Lake rebuilds and
+    // the Import models alike — so it is inert only when the combined count is
+    // zero. The model shape multiplies the Direct Lake sub-term alone: models
+    // staying on Import are priced by a fixed coefficient the shape never
+    // touches. Keyed on the combined count it stayed enabled, with no note, for
+    // an estate of Import-only models — where cycling clean / mixed / heavy
+    // printed the same estimate three times over. It is keyed on the Direct
+    // Lake count alone.
+    //
+    // Either way the lock is a display state over the user's own setting: the
+    // choice is put back untouched the moment the models reappear.
+    const noModels   = num(els.dlModels, 0) + num(els.importModels, 0) === 0;
+    const noDlModels = num(els.dlModels, 0) === 0;
+    els.capacitySku.classList.toggle('locked', noModels);
+    segButtons(els.capacitySku).forEach(b => { b.disabled = noModels; });
+    els.skuNote.hidden = !noModels;
+    if (!noModels && els.capacitySku.dataset.value !== manual.sku) setSegmented(els.capacitySku, manual.sku);
+    els.dlShape.disabled = noDlModels;
+    els.dlShapeNote.hidden = !noDlModels;
+    if (!noDlModels && els.dlShape.value !== manual.dlShape) els.dlShape.value = manual.dlShape;
+  }
+
+  function compute(){
+    syncLocks();
+
+    // ---- inputs, guarded ------------------------------------------------
+    const units            = Math.max(1, num(els.units, 1));
+    const reports          = num(els.reports, 0);
+    const modelsToDirectLake = num(els.dlModels, 0);
+    const modelsStayingImport = num(els.importModels, 0);
+    const tables           = num(els.tables, 0);
+    const pipelines        = num(els.pipelines, 0);
+    const sourceSystems    = Math.max(1, num(els.sourceSystems, 1));
+    const volumeTB         = num(els.volume, 0);
+
+    const platform     = PLATFORMS[els.platform.value] || PLATFORMS.synapseSql;
+    const isOnPrem     = platform.onPrem;
+    const needsGateway = isOnPrem || els.gateway.checked;
+    const regulated    = els.regulated.checked;
+
+    const complexity   = els.complexity.dataset.value;
+    const experience   = els.experience.dataset.value;
+    const streams      = Math.max(1, parseInt(els.streams.dataset.value, 10) || 1);
+    const dqDebt       = els.dqDebt.dataset.value;
+    const sku          = els.capacitySku.dataset.value;
+    const dlShape      = els.dlShape.value;
+    const zeroDowntime = els.zeroDowntime.checked;
+    const parallelRun  = els.zeroDowntime.checked || els.parallelRun.checked;
+    const closeCycle   = els.closeCycle.value;
+
+    const expMult  = { new: 1.6, some: 1.0, fluent: 0.9 }[experience] || 1.0;
+    const perUnit  = { low: 0.8, medium: 1.3, high: 2.2 }[complexity] || 1.3;
+    const dqMult   = { low: 1.0, medium: 1.10, high: 1.25 }[dqDebt] || 1.0;
+    // An undersized capacity does not make the work smaller — it makes it likelier
+    // to be redone, so it prices up, and F128+ buys a little headroom back.
+    const skuMult  = { small: 1.4, f64: 1.0, large: 0.9 }[sku] || 1.0;
+    // Direct Lake is a repoint only for a clean star schema. Calculated columns,
+    // views, composite models and exotic column types are a rebuild.
+    const perModel = { clean: 0.3, mixed: 0.8, heavy: 2.0 }[dlShape] || 0.8;
+    const leadWeeks = { none: 0, standard: 3, slow: 8 }[els.provisioning.value] || 0;
+
+    // ---- Assess — sublinear in estate breadth, larger constant, smooth ---
+    const assess = 1.5 + 0.9 * Math.log2(1 + units) + 0.4 * (sourceSystems - 1);
+
+    // ---- Provisioning — calendar, not effort. Capacity procurement, private
+    // networking, Entra and workspace identity, RLS/OLS: client IT paces it and
+    // no amount of Sparq staffing shortens it. It runs concurrently with Assess,
+    // so only the part that overhangs Assess reaches the critical path.
+    // Snapped to zero below the bar's draw threshold: a band that is not drawn
+    // must not sit in the total either, or the segments stop summing to the
+    // printed point estimate. The Snowflake sibling snaps the same two phases.
+    let leadAdd = Math.max(0, leadWeeks - assess);
+    if (leadAdd < 0.05) leadAdd = 0;
+
+    // ---- Build — the real platform foundation. Driven by how many places
+    // data comes from and how hard they are to reach, NOT by complexity, and
+    // NOT by the client's fluency: this is Sparq's own work. Zero-downtime adds
+    // the switchover harness here; each extra crew adds coordination here too.
+    const build = (2.5 + 0.5 * (sourceSystems - 1)
+                  + (needsGateway ? 1.0 : 0)
+                  + (regulated ? 1.5 : 0)
+                  + (zeroDowntime ? 0.75 : 0)
+                  + 0.25 * (streams - 1)) * platform.buildMult;
+
+    // ---- Pilot — one unit end to end, before the waves start -------------
+    const pilot = { low: 2, medium: 3, high: 4 }[complexity] || 3;
+
+    // ---- Crews — the split is real but bounded: streams contend for one
+    // capacity, the same source extract windows, and the same client SMEs.
+    const streamDivRaw = Math.pow(streams, 0.85);
+    const streamDiv    = Math.min(2.2, streamDivRaw);
+    const streamDivCapped = streamDivRaw > 2.2 + 1e-9;
+
+    // ---- Waves — the conversion work itself ------------------------------
+    // Effective counts: tapered and kneed, and used for both the wave terms and
+    // the validation terms so one count never behaves two ways.
+    const tablesEff   = effTables(tables);
+    const dlEff       = effModels(modelsToDirectLake);
+    const impEff      = effModels(modelsStayingImport);
+    const tablesKneed = tables > TABLE_KNEE;
+    const modelsKneed = modelsToDirectLake > MODEL_KNEE || modelsStayingImport > MODEL_KNEE;
+
+    const tableTerm  = 0.004 * tablesEff;
+    // Bulk load is minutes per TB, so volume is a log nudge capped at 3 weeks.
+    const volTerm    = Math.min(3, Math.max(0, 0.8 * Math.log10(Math.max(volumeTB, 5) / 5)));
+    const unitWork   = perUnit * Math.pow(units, 0.85);        // learning curve across units
+    const reportWork = 0.15 * Math.pow(reports, 0.8);
+    const dlWork     = (perModel * dlEff + 0.1 * impEff) * skuMult;
+    // A pipeline estate carries a fixed per-environment charge whatever its size:
+    // workspace identity, Key Vault, and per-pipeline scheduling with no hub.
+    const pipeWork   = pipelines > 0 ? 0.6 + 0.18 * Math.pow(pipelines, 0.8) : 0;
+
+    // Client fluency gates wave sign-off, but it does not scale the engineering
+    // one for one — half strength here, full strength on the phases it owns.
+    const wavesExp     = 1 + 0.5 * (expMult - 1);
+    // Terms that bear on every kind of wave work, whichever side of the move it
+    // sits on: client fluency at half strength, data-quality debt, regulation.
+    const genericStack = wavesExp * dqMult * (regulated ? 1.15 : 1);
+    // The source-platform multiplier sits inside the source-side stack ONLY —
+    // units, tables and pipelines. Reports and Direct Lake models are built on
+    // Fabric, or repointed at it, so their difficulty is set by Fabric and not
+    // by the system being left behind: a semantic model is not 1.45x harder to
+    // rebuild because the source happened to be Oracle. The Snowflake sibling
+    // splits the stack the same way.
+    const waveStackRaw = platform.waveMult * genericStack;
+    const waveStack    = Math.min(STACK_CAP, waveStackRaw);
+    const waveStackCapped = waveStackRaw > STACK_CAP + 1e-9;
+    const biStack      = Math.min(STACK_CAP, genericStack);
+
+    const cycleWeeks = { none: 0, daily: 2, weekly: 4, monthly: 9, quarterly: 14 };
+    const closeWeeks = parallelRun ? (cycleWeeks[closeCycle] || 0) : 0;
+    // Running the parallel window is engineering, not just calendar: CDC, delta
+    // reconciliation and catch-up loads. Sustained work, so it is added after the
+    // multiplier stack and never divided across crews. parallelAdd below can never
+    // exceed closeWeeks (it is closeWeeks less a non-negative absorption), so the
+    // documented max() always resolves to closeWeeks — no circular definition.
+    const syncWork = parallelRun ? 0.25 * closeWeeks : 0;
+
+    const srcSide = (unitWork + pipeWork + tableTerm) * waveStack;
+    const biSide  = (reportWork + dlWork) * biStack;
+
+    const waves = (srcSide + biSide) / streamDiv
+                + volTerm + syncWork;
+
+    // ---- Parallel run — calendar-bound. Never multiplied, never divided:
+    // you cannot staff your way through a month-end close. Waves already
+    // running long absorb part of it.
+    let parallelAdd = parallelRun ? Math.max(0, closeWeeks - 0.4 * waves) : 0;
+    if (parallelAdd < 0.05) parallelAdd = 0;
+
+    // A long wave phase can absorb the close outright, which legitimately
+    // leaves no Parallel run band. The output has to name that case, or the
+    // chart and the assumptions text end up contradicting each other.
+    const closeState = !parallelRun            ? 'off'
+                     : closeCycle === 'none'   ? 'noClose'
+                     : parallelAdd > 0         ? 'extends'
+                     : 'absorbed';
+
+    // ---- Validation and reconciliation — proving the migrated data matches
+    // source. Warehouse takes PK / UNIQUE / FK as NOT ENFORCED, so integrity has
+    // to be proven in ETL and tests, and the documented type conversions are
+    // lossy, so parity is checked row by row. Distinct from cleaning bad source
+    // data, which stays out of scope.
+    // Validation compounds the same soft factors as the waves — data-quality
+    // debt, regulated data, and client fluency at full strength, since the
+    // client's own team paces sign-off — so it takes the same ceiling. Until
+    // REV. D it had none, and reached 2.50x unchecked while the wave ceiling
+    // sat too high to engage.
+    const reconMultRaw    = dqMult * (regulated ? 1.25 : 1) * expMult;
+    const reconMult       = Math.min(STACK_CAP, reconMultRaw);
+    const reconMultCapped = reconMultRaw > STACK_CAP + 1e-9;
+
+    const recon = (1.0 + 0.06 * Math.pow(tablesEff, 0.7)
+                  + 0.1 * (dlEff + impEff)
+                  + 0.5 * (sourceSystems - 1))
+                * reconMult / streamDiv;
+
+    // ---- Hypercare — scales with the surface actually delivered, and with
+    // how fast the client's own team can take it on.
+    const hyper = (Math.min(10, Math.max(3, 0.15 * (build + pilot + waves)))
+                  + (regulated ? 1 : 0)) * expMult;
+
+    // ---- Enablement — runs alongside pilot and waves; only part of it
+    // lands on the critical path.
+    const enablement = Math.min(8, Math.max(1, 0.25 * (pilot + waves))) * expMult;
+
+    const subtotal = leadAdd + assess + build + pilot + waves + recon
+                   + parallelAdd + hyper + 0.3 * enablement;
+
+    // ---- The band. Two-sided and scope-dependent: the point estimate sits
+    // inside it, and the high end widens with scope and with each thing that
+    // historically slips.
+    const skuUndersized = sku === 'small' && modelsToDirectLake > 0;
+    let highMult = 1.25 + 0.10 * Math.log(1 + subtotal / 12)
+                 + (experience === 'new' ? 0.10 : 0)
+                 + (isOnPrem ? 0.08 : 0)
+                 + (regulated ? 0.08 : 0)
+                 + Math.min(0.08, 0.01 * recon)
+                 + (skuUndersized ? 0.05 : 0);
+    highMult = Math.min(2.0, highMult);
+    const low  = subtotal * 0.9;
+    const high = subtotal * highMult;
+
+    // The 30% of enablement the maths charges to the critical path is a real
+    // sequential cost, so it is drawn as a segment rather than left implied by a
+    // fully concurrent overlay. The overlay band still shows the whole
+    // enablement effort; this is only the part of it the waves do not cover.
+    const enableCriticalPath = 0.3 * enablement;
+
+    const phases = [
+      { key:'provision', label:'Provisioning',    weeks: leadAdd },
+      { key:'assess',    label:'Assess',          weeks: assess },
+      { key:'build',     label:'Build',           weeks: build },
+      { key:'pilot',     label:'Pilot',           weeks: pilot },
+      { key:'waves',     label:'Migration waves', weeks: waves },
+      { key:'recon',     label:'Validation',      weeks: recon },
+      { key:'parallel',  label:'Parallel run',    weeks: parallelAdd },
+      { key:'hyper',     label:'Hypercare',       weeks: hyper },
+      { key:'enableCp',  label:'Enablement — non-overlapping', weeks: enableCriticalPath,
+        tag:'critical path',
+        note:'the part of enablement the pilot and wave phases do not cover' },
+    ].filter(p => p.weeks > 0);   // provisioning and parallel run only when they exist
+
+    render({ low, high, subtotal, highMult, phases, enablement, enableCriticalPath, streams,
+             closeWeeks,
+             experience, isOnPrem, regulated, parallelRun, volTerm,
+             closeState, closeCycle, parallelAdd, waves, recon, syncWork,
+             leadWeeks, leadAdd, waveStack, waveStackRaw, waveStackCapped, biStack,
+             reconMult, reconMultRaw, reconMultCapped, stackCap: STACK_CAP,
+             platform, platformLabel: platform.label,
+             streamDiv, streamDivCapped, sku, dlShape, skuUndersized,
+             modelsToDirectLake, pipelines, tables,
+             tablesEff, dlEff, impEff, tablesKneed, modelsKneed,
+             tableKnee: TABLE_KNEE, modelKnee: MODEL_KNEE,
+             tableTermCeiling: 0.004 * effTables(TABLE_KNEE) });
+  }
+
+  // Ruler spacing is derived from the total, not capped at a constant, so the
+  // tick count stays in the same handful whether the answer is 10 weeks or
+  // 3,000 — where the old fixed cap of 8 would have built hundreds of thousands
+  // of nodes and frozen the tab. Spacings are human-readable weeks
+  // (1, 2, 4, 5, 10, 20, 25, 40, 50, 100, 200, 250 …), never odd fractions.
+  const TICK_STEPS = (() => {
+    const out = [];
+    for (let d = 0; d < 12; d++){
+      const pow = Math.pow(10, d);
+      [1, 2, 2.5, 4, 5].forEach(mult => {
+        const step = mult * pow;
+        if (Number.isInteger(step)) out.push(step);   // ascending by construction
+      });
+    }
+    return out;
+  })();
+
+  // Label width is measured in the ruler's own font at the current magnitude —
+  // 'wk 1,234,567' is three times the width of 'wk 28' — rather than assumed, so
+  // the tick count is a width test and not just a DOM-node ceiling.
+  function measureTickLabel(text){
+    const probe = document.createElement('span');
+    probe.textContent = text;
+    probe.style.visibility = 'hidden';
+    probe.style.left = '0';
+    els.ruler.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return w;
+  }
+
+  function tickStep(total, trackW){
+    const IDEAL = 9, MAX_TICKS = 20, GUTTER = 10;
+    const span = Math.max(total, 0);                  // the loop's own upper bound
+    // widest label the loop can print at this magnitude
+    const widest = measureTickLabel('wk ' + fmtInt(Math.floor(span)));
+    const fits = trackW > 0
+      ? Math.max(2, Math.floor(trackW / (widest + GUTTER)) + 1)
+      : MAX_TICKS;
+    const cap = Math.min(MAX_TICKS, fits);
+    const ideal = Math.min(IDEAL, cap);
+    let best = TICK_STEPS[TICK_STEPS.length - 1], bestScore = Infinity;
+    for (const step of TICK_STEPS){
+      const count = Math.floor(span / step) + 1;      // exactly what the loop will draw
+      if (count > cap) continue;                      // no collisions, no DOM blowout
+      const score = Math.abs(count - ideal) + (count < 6 && cap >= 6 ? 5 : 0);
+      if (score < bestScore){ bestScore = score; best = step; }
+    }
+    return best;
+  }
+
+  const CLOSE_LABEL = { none: 'none', daily: 'daily', weekly: 'weekly',
+                        monthly: 'monthly', quarterly: 'quarterly' };
+  // What the parallel window actually has to prove at each cycle length — a
+  // daily close is not a fortnight long, but proving one takes a fortnight of
+  // them side by side.
+  const CLOSE_WINDOW = { none: 'nothing',
+                         daily: 'a fortnight of daily closes',
+                         weekly: 'a month of weekly closes',
+                         monthly: 'one full month-end close',
+                         quarterly: 'one full quarter-end close' };
+
+  function render(r){
+    const { low, high, subtotal, highMult, phases, enablement } = r;
+
+    els.rangeOut.textContent = `${fmtInt(low)}–${fmtInt(high)}`;
+
+    // The whole answer in one sentence, for the role="status" region: a change
+    // to any control is announced here without a screen-reader user having to
+    // walk the bar, the legend and eight paragraphs of assumptions to find it.
+    els.srSummary.textContent =
+      `Estimate ${fmtInt(low)} to ${fmtInt(high)} weeks, provisioning through hypercare. ` +
+      `Point estimate ${fmt1(subtotal)} weeks across ${fmtInt(phases.length)} ` +
+      `phase${phases.length === 1 ? '' : 's'}: ` +
+      phases.map(ph => `${ph.label} ${fmt1(ph.weeks)}`).join(', ') + ' weeks.';
+
+    // The bar and the ruler are drawn against the same number the headline and
+    // the assumptions text quote: the point estimate. The sequential segments —
+    // now including the critical-path slice of enablement — add up to it.
+    const total = subtotal;
+
+    // ruler ticks across the sequential total. The loop stops at the last whole
+    // step that actually falls ON the bar, so no gridline is ever asserted at a
+    // week the bar does not reach and no tick is positioned past 100%.
+    els.ruler.innerHTML = '';
+    const trackW = els.ruler.clientWidth;
+    const tickEvery = tickStep(total, trackW);
+    const labels = [];
+    for (let w = 0; w <= total + 1e-9; w += tickEvery){
+      const pct = Math.min(100, (w / total) * 100);
+      const tick = document.createElement('i');
+      tick.style.left = pct + '%';
+      els.ruler.appendChild(tick);
+      const t = document.createElement('span');
+      t.style.left = pct + '%';
+      t.textContent = 'wk ' + fmtInt(w);
+      els.ruler.appendChild(t);
+      labels.push({ el: t, pct });
+    }
+    // and the labels themselves are pulled inside the track, so an end label is
+    // never half-painted outside the card.
+    if (trackW > 0){
+      labels.forEach(({ el, pct }) => {
+        const half = el.getBoundingClientRect().width / 2;
+        const centre = Math.min(Math.max(pct / 100 * trackW, half), Math.max(half, trackW - half));
+        el.style.left = centre + 'px';
+      });
+    }
+
+    els.timeline.innerHTML = '';
+    els.legend.innerHTML = '';
+    let enableCpRow = null;
+    phases.forEach(p => {
+      const pct = (p.weeks / total) * 100;
+      const div = document.createElement('div');
+      div.className = 'phase';
+      div.style.width = pct + '%';
+      div.style.background = PHASE_COLORS[p.key];
+      const lab = document.createElement('span');
+      lab.className = 'phase-label';
+      lab.style.color = PHASE_LABEL_INK[p.key];
+      lab.textContent = p.label;
+      div.appendChild(lab);
+      div.title = `${p.label}: ~${fmt1(p.weeks)} wks` + (p.note ? ` — ${p.note}` : '');
+      els.timeline.appendChild(div);
+
+      const row = document.createElement('div');
+      row.className = 'legend-row';
+      row.innerHTML = `
+        <span class="legend-name">
+          <span class="swatch" style="background:${PHASE_COLORS[p.key]}"></span>
+          ${p.label}
+          ${p.tag ? `<span class="tag">${p.tag}</span>` : ''}
+        </span>
+        <span class="legend-weeks">~${fmt1(p.weeks)} wks</span>
+      `;
+      els.legend.appendChild(row);
+      if (p.key === 'enableCp') enableCpRow = row;
+    });
+
+    // A parallel run in effect with nothing to add has no band to draw, so it
+    // gets a legend row of its own rather than vanishing from the output.
+    if (r.closeState === 'absorbed' || r.closeState === 'noClose'){
+      const absorbed = r.closeState === 'absorbed';
+      const row = document.createElement('div');
+      row.className = 'legend-row absorbed';
+      row.innerHTML = `
+        <span class="legend-name">
+          <span class="swatch" style="background:${PHASE_COLORS.parallel}"></span>
+          Parallel run
+          <span class="tag">${absorbed ? 'absorbed' : 'no close'}</span>
+        </span>
+        <span class="legend-weeks">${fmt1(0)} wks <span class="aside">· ${absorbed ? 'inside migration waves' : 'nothing to tie off'}</span></span>
+      `;
+      els.legend.appendChild(row);
+    }
+
+    // keep the two enablement rows together at the foot of the legend
+    if (enableCpRow) els.legend.appendChild(enableCpRow);
+
+    // Labels are measured, not guessed: any band too narrow for its own name
+    // drops the label and keeps the hover title and the legend row instead.
+    els.timeline.querySelectorAll('.phase').forEach(div => {
+      const lab = div.querySelector('.phase-label');
+      if (lab && lab.scrollWidth > div.clientWidth - 2) lab.remove();
+    });
+
+    // ---- the concurrent band: enablement starts with pilot and runs
+    // alongside the waves, so it is drawn under the bar, not in the stack.
+    const pilotStart = phases
+      .filter(p => p.key === 'provision' || p.key === 'assess' || p.key === 'build')
+      .reduce((s,p) => s + p.weeks, 0);
+    const leftPct  = (pilotStart / total) * 100;
+    const widthPct = Math.min(100 - leftPct, (enablement / total) * 100);
+
+    els.overlayTrack.innerHTML = '';
+    const band = document.createElement('div');
+    band.className = 'overlay-band';
+    band.style.left = leftPct + '%';
+    band.style.width = widthPct + '%';
+    band.title = `Enablement: ~${fmt1(enablement)} wks in total, running alongside pilot and waves; ` +
+                 `the ~${fmt1(r.enableCriticalPath)} wks they do not cover is drawn as the closing segment of the bar`;
+    const lab = document.createElement('span');
+    lab.className = 'phase-label';
+    lab.style.paddingLeft = '6px';
+    lab.textContent = 'Enablement — runs in parallel';
+    band.appendChild(lab);
+    els.overlayTrack.appendChild(band);
+
+    // Same measured rule: if the caption doesn't fit inside the band it moves
+    // alongside it, so "runs in parallel" is always on screen.
+    const inWide = lab.scrollWidth <= band.clientWidth - 4;
+    if (!inWide){
+      lab.remove();
+      const aside = document.createElement('div');
+      aside.className = 'overlay-aside';
+      aside.style.setProperty('--aside-left', `calc(${Math.min(leftPct + widthPct, 74)}% + 8px)`);
+      aside.textContent = 'Enablement — runs in parallel';  // same words as the wide band
+      els.overlayTrack.appendChild(aside);
+    }
+
+    // ---- flags: what the model warned about, and what it held back --------
+    els.flags.innerHTML = '';
+    const flag = (kind, tag, body) => {
+      const box = document.createElement('div');
+      box.className = kind ? 'flag ' + kind : 'flag';
+      const t = document.createElement('span');
+      t.className = 'flag-tag';
+      t.textContent = tag;
+      const para = document.createElement('p');
+      para.textContent = body;
+      box.appendChild(t);
+      box.appendChild(para);
+      els.flags.appendChild(box);
+    };
+
+    if (r.skuUndersized){
+      flag('warn', 'Capacity',
+        `F2–F32 with ${fmtInt(r.modelsToDirectLake)} Direct Lake model${r.modelsToDirectLake > 1 ? 's' : ''}: ` +
+        `this SKU caps Direct Lake at 300 million rows per table and 3–10 GB of model memory. ` +
+        `A table over the guardrail — or one built on a SQL view, or under granular access control — ` +
+        `falls back to DirectQuery silently, so the models are priced for rework and the high end is widened.`);
+    }
+    if (r.waveStackCapped){
+      flag('', 'Capped',
+        `Source platform, client fluency, data-quality debt and regulated data compound to ` +
+        `×${fmt2(r.waveStackRaw)} on source-side wave work — units, tables and pipelines. That stack is held at ` +
+        `×${fmt2(r.stackCap)}, so the source-side figure is a floor rather than a computed number. Report and Direct Lake ` +
+        `work is unaffected: it carries ×${fmt2(r.biStack)} without the source label.`);
+    }
+    if (r.tablesKneed){
+      flag('', 'Capped',
+        `${fmtInt(r.tables)} tables is past the point where tables are converted one at a time. The table term ` +
+        `runs sublinear and stops growing at ${fmtInt(r.tableKnee)} tables — ~${fmt1(r.tableTermCeiling)} weeks before the ` +
+        `multiplier stack — on the argument that beyond that an estate is converted by a generated, ` +
+        `metadata-driven factory and the marginal table adds no schedule. The tables above ` +
+        `${fmtInt(r.tableKnee)} are priced at zero, so this figure is a floor.`);
+    }
+    if (r.modelsKneed){
+      flag('', 'Capped',
+        `Semantic-model count is past ${fmtInt(r.modelKnee)}, where the model term stops growing: an estate that large ` +
+        `runs a model factory — shared date dimensions, a common measure library, a templated deployment — ` +
+        `so the sixty-first model is a copy rather than a build. Models above ${fmtInt(r.modelKnee)} are priced ` +
+        `at zero here, in the waves and in validation both, so this figure is a floor.`);
+    }
+    if (r.reconMultCapped){
+      flag('', 'Capped',
+        `Client fluency, data-quality debt and regulated data compound to ×${fmt2(r.reconMultRaw)} on validation and ` +
+        `reconciliation. That stack is held at the same ×${fmt2(r.stackCap)} ceiling, so the ~${fmt1(r.recon)}-week ` +
+        `validation figure is a floor too — an estate this far out on every axis should be assessed before it is quoted.`);
+    }
+
+    const eRow = document.createElement('div');
+    eRow.className = 'legend-row concurrent';
+    eRow.innerHTML = `
+      <span class="legend-name">
+        <span class="swatch" style="background:${PHASE_COLORS.enable}"></span>
+        Enablement
+        <span class="tag">concurrent</span>
+      </span>
+      <span class="legend-weeks">~${fmt1(enablement)} wks <span class="aside">· ~${fmt1(r.enableCriticalPath)} of it on the critical path, drawn above</span></span>
+    `;
+    els.legend.appendChild(eRow);
+
+    // ---- assumptions copy, assembled from what is actually switched on ----
+    const widen = [];
+    if (r.experience === 'new') widen.push('a client team new to Fabric');
+    if (r.isOnPrem) widen.push('on-prem sources');
+    if (r.regulated) widen.push('regulated data');
+
+    const paras = [];
+
+    paras.push(
+      `Point estimate ~${fmt1(subtotal)} weeks — the figure the bar below is drawn to, segment for segment — ` +
+      `and it sits inside the band, not on its floor: ` +
+      `low is 0.9× the estimate, high is ${highMult.toFixed(2)}×. The high end widens with total scope` +
+      (widen.length ? `, and here also with ${widen.join(', ')}` : ` — and further with an inexperienced client team, on-prem sources, or regulated data`) +
+      `.`);
+
+    if (r.leadWeeks > 0){
+      paras.push(
+        `Provisioning is client-IT calendar, not Sparq effort: ~${fmtInt(r.leadWeeks)} weeks of capacity sizing, ` +
+        `private networking, Entra and workspace identity, and RLS/OLS re-implementation. It runs ` +
+        (r.leadAdd > 0
+          ? `alongside Assess, so only the ~${fmt1(r.leadAdd)} weeks that overhang Assess are drawn — nothing multiplies or divides them.`
+          : `alongside Assess and finishes inside it, so it adds no weeks of its own.`));
+    }
+
+    paras.push(
+      `Migration waves carry the conversion work — units, reports, Direct Lake models, pipelines, and tables — ` +
+      `across ${fmtInt(r.streams)} delivery stream${r.streams > 1 ? 's' : ''}` +
+      (r.streams > 1
+        ? `, and the split is sub-linear: crews contend for one capacity, the same source extract windows, and the same client approvers, so the divisor stops at 2.2×${r.streamDivCapped ? ' — which it has hit here' : ''}, and each extra crew adds a quarter-week of coordination to Build.`
+        : `.`) +
+      ` Data volume adds only ~${fmt1(r.volTerm)} weeks: bulk load runs at minutes per terabyte, so table ` +
+      `count drives the work, not size. Table and model counts are priced on a calibrated table-equivalent that ` +
+      `grows sublinearly — each doubling of the estate costs less than double, because the second thousand tables ` +
+      `is converted with the patterns the first thousand paid for. That is the shape of the curve, not a discount at ` +
+      `every size: ${fmtInt(r.tables)} tables price as ~${fmtInt(r.tablesEff)} table-equivalents here, and the model term is ` +
+      `tapered the same way` +
+      (r.tablesKneed || r.modelsKneed
+        ? `, and both stop growing at their ceilings, which this estate is past.`
+        : `. Both stop growing entirely past ${fmtInt(r.tableKnee)} tables and ${fmtInt(r.modelKnee)} models.`));
+
+    paras.push(
+      `The source platform prices two separate things, and only one of them is source-side conversion. ` +
+      `${r.platformLabel} carries ×${fmt2(r.platform.buildMult)} on the whole Build foundation — which rescales the gateway, ` +
+      `regulated-control and zero-downtime switchover adders along with it, and is why Build runs 1.5 weeks out of ` +
+      `Power BI against 5.6 out of Oracle on one and the same estate. On the conversion work itself it carries ` +
+      `×${fmt2(r.platform.waveMult)} on units, ` +
+      `tables and pipelines — the extraction, the type mapping, the pipeline rewrite — and nothing on reports or ` +
+      `Direct Lake models. Those are built on Fabric, or existing items are repointed at it, so either way the work ` +
+      `is target-side and Fabric sets its difficulty: a semantic model is not ×${fmt2(r.platform.waveMult)} harder to rebuild ` +
+      `because the source was ${r.platformLabel}. Report and model work still carries the terms that genuinely bear on it — ` +
+      `client fluency at half strength, data-quality debt and regulated data — at ×${fmt2(r.biStack)} here, against ` +
+      `×${fmt2(r.waveStack)} on the source side.`);
+
+    paras.push(
+      `Validation and reconciliation is a phase of its own at ~${fmt1(r.recon)} weeks — proving the ` +
+      `migrated data matches source, which is not the same job as cleaning it. Fabric Warehouse accepts ` +
+      `PRIMARY KEY, UNIQUE and FOREIGN KEY only as NOT ENFORCED, so integrity has to be proven in the ETL ` +
+      `and in tests, and the documented type conversions lose information — datetimeoffset to datetime2 ` +
+      `drops the offset, money becomes decimal(19,4), nvarchar becomes varchar — each needing row-level checks. ` +
+      `It compounds client fluency, data-quality debt and regulated data to ×${fmt2(r.reconMult)}, now under the same ` +
+      `×${fmt2(r.stackCap)} ceiling the wave stacks carry` +
+      (r.reconMultCapped ? ` — which it has hit here, so the figure is a floor.` : `.`));
+
+    if (r.closeState === 'extends'){
+      paras.push(
+        `Parallel run is calendar-bound: on a ${CLOSE_LABEL[r.closeCycle]} close cycle the window has to run both systems ` +
+        `side by side long enough to prove ${CLOSE_WINDOW[r.closeCycle]} — ~${fmt1(r.closeWeeks)} weeks of it — and no ` +
+        `number of crews shortens a calendar. Only the ~${fmt1(r.parallelAdd)} weeks it runs past the migration-wave ` +
+        `phase show as a band of their own. Keeping both systems in step through the window — CDC, delta reconciliation, ` +
+        `catch-up loads — is engineering, not just waiting: ~${fmt1(r.syncWork)} weeks of it sit inside the wave phase.`);
+    } else if (r.closeState === 'absorbed'){
+      paras.push(
+        `On a ${CLOSE_LABEL[r.closeCycle]} close cycle the parallel run still has to hold both systems side by side long ` +
+        `enough to prove ${CLOSE_WINDOW[r.closeCycle]} — a ~${fmt1(r.closeWeeks)}-week window — but the migration-wave ` +
+        `phase is long enough at ~${fmt1(r.waves)} weeks to absorb it, so it adds no weeks of its own, which is why no ` +
+        `Parallel run band appears above. The ~${fmt1(r.syncWork)} weeks of sync work it takes to hold both ` +
+        `systems together are inside that wave figure.`);
+    } else if (r.closeState === 'noClose'){
+      paras.push(`A parallel run is in effect, but with no close to tie off it adds no weeks of its own.`);
+    }
+
+    paras.push(
+      `Client fluency describes the client's team, so it prices the phases they actually pace — validation, ` +
+      `enablement and hypercare — in full, and gates wave sign-off at half strength. It no longer scales Build: ` +
+      `the platform foundation is Sparq's own work and does not move with it. Enablement runs alongside pilot ` +
+      `and waves — the band under the bar is the whole effort — but only ~30% of it, ~${fmt1(r.enableCriticalPath)} weeks ` +
+      `here, is work the waves do not cover, so that much is charged to the critical path and drawn as the bar's ` +
+      `closing segment.`);
+
+    paras.push(
+      `Three things changed in the model at REV. D. First, the source-platform multiplier no longer scales the whole ` +
+      `wave phase — it prices units, tables and pipelines only, and report and Direct Lake work sits in a stack of its ` +
+      `own, because that work is built on Fabric whichever system is being left behind. Second, the multiplier ceiling ` +
+      `came down from ×2.50 to ×${fmt2(r.stackCap)} and now covers validation as well as the waves: at ×2.50 it engaged in 1 of ` +
+      `the 126 combinations of source platform, fluency, data-quality debt and regulated data, while validation ` +
+      `compounded the same factors to ×2.50 with no ceiling at all — the cap that existed did nothing and the phase ` +
+      `that needed one did not have it. At ×${fmt2(r.stackCap)} it engages on roughly the top 15% of that space and leaves ` +
+      `mid-range estates where they were. Third, table count and semantic-model count — the last two strictly linear ` +
+      `estate terms — now run sublinear at an exponent of 0.90 with knees at ${fmtInt(r.tableKnee)} tables and ` +
+      `${fmtInt(r.modelKnee)} models, in the waves and in validation alike. A 200-table departmental estate and a ` +
+      `2,000-table mid-market estate print within about 3% and 4.5% of REV. C; an 18,000-table regulated estate ` +
+      `comes down by about a third.`);
+
+    els.assumptions.innerHTML = '';
+    paras.forEach(t => {
+      const para = document.createElement('p');
+      para.textContent = t;
+      els.assumptions.appendChild(para);
+    });
+  }
+
+  // The ruler's tick count and its label placement are both measured against the
+  // live track width and the live font, so both have to be redone when either
+  // changes.
+  let resizeTimer = null;
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(compute, 120);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(compute);
+
+  compute();
+</script>
+</body>
+</html>
