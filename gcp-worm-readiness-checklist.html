@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GCP WORM Ledger Readiness</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap">
+<style>
+  /* Sparq palette. Measured contrast on light ground #F9F7F5:
+     ink #16110F 17:1 · body #51453F 8.1:1 · muted #71635C 5.5:1
+     accent text #A23F2B 6.1:1 · sage text #3C4E3C 8.4:1
+     ink #231A17 on accent fill #E75437 4.70:1 (AA normal text).
+     Not reached: #E75437 as *text* on the light ground is 3.14:1, so it is
+     used only as a fill, a rule, or a meter segment — never as body copy.
+     #667E66 on light is 4.26:1, so it is confined to >=18.66px/bold and
+     non-text meter fills; small sage copy uses #3C4E3C. */
+  :root {
+    color-scheme: light;
+    --ground: #F9F7F5;
+    --surface: #F2ECEA;
+    --surface-2: #EBE5E2;
+    --rule: #D9D1CE;
+    --rule-strong: #B8B0AD;
+    --ink: #16110F;
+    --ink-2: #51453F;
+    --ink-3: #71635C;
+    --accent: #E75437;
+    --accent-ink: #231A17;
+    --accent-text: #A23F2B;
+    --accent-soft: #F9DDD8;
+    --sage: #3C4E3C;
+    --sage-mid: #667E66;
+    --sage-soft: #D8DED8;
+    --track: #D9D1CE;
+    --focus: #A23F2B;
+    --shadow: 0 1px 2px rgba(35, 26, 23, .06), 0 8px 24px -18px rgba(35, 26, 23, .35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #16110F;
+      --surface: #231A17;
+      --surface-2: #392E27;
+      --rule: #392E27;
+      --rule-strong: #51453F;
+      --ink: #F2ECEA;
+      --ink-2: #D9D1CE;
+      --ink-3: #B8B0AD;
+      --accent: #E75437;
+      --accent-ink: #231A17;
+      --accent-text: #F0AB9D;
+      --accent-soft: #392E27;
+      --sage: #ADC0AD;
+      --sage-mid: #667E66;
+      --sage-soft: #3C4E3C;
+      --track: #392E27;
+      --focus: #F0AB9D;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -20px rgba(0, 0, 0, .8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #16110F;
+    --surface: #231A17;
+    --surface-2: #392E27;
+    --rule: #392E27;
+    --rule-strong: #51453F;
+    --ink: #F2ECEA;
+    --ink-2: #D9D1CE;
+    --ink-3: #B8B0AD;
+    --accent: #E75437;
+    --accent-ink: #231A17;
+    --accent-text: #F0AB9D;
+    --accent-soft: #392E27;
+    --sage: #ADC0AD;
+    --sage-mid: #667E66;
+    --sage-soft: #3C4E3C;
+    --track: #392E27;
+    --focus: #F0AB9D;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -20px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink-2);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 58rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: clamp(28px, 5vw, 56px) 64px;
+  }
+  h1, h2, h3 { color: var(--ink); text-wrap: balance; margin: 0; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* ---------- masthead ---------- */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .brand .mark {
+    width: 22px; height: 22px; flex: none;
+    display: grid; place-items: center;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 3px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .brand .sep { color: var(--rule-strong); }
+  h1 {
+    margin-top: 18px;
+    font-size: clamp(1.75rem, 4.4vw, 2.6rem);
+    font-weight: 600;
+    letter-spacing: -.022em;
+    line-height: 1.12;
+  }
+  .lede {
+    margin: 14px 0 0;
+    max-width: 62ch;
+    font-size: 1.0625rem;
+    color: var(--ink-2);
+  }
+  .standards {
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .standards li {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .7rem;
+    letter-spacing: .04em;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 3px 8px;
+  }
+
+  /* ---------- status band ---------- */
+  .status {
+    margin-top: clamp(28px, 4vw, 40px);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: clamp(20px, 3vw, 28px);
+    box-shadow: var(--shadow);
+  }
+  .status-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 24px;
+  }
+  .count {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .count b { font-size: clamp(2.4rem, 7vw, 3.25rem); font-weight: 600; line-height: .9; letter-spacing: -.03em; }
+  .count span { font-size: 1.125rem; color: var(--ink-3); }
+  .count-label {
+    display: block;
+    margin-top: 10px;
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .pct {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--accent-text);
+  }
+  .pct small {
+    display: block;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: right;
+  }
+
+  /* 19 cells, one per task — the ledger reads as blocks */
+  .blocks {
+    margin-top: 22px;
+    display: grid;
+    grid-template-columns: repeat(19, 1fr);
+    gap: 3px;
+  }
+  .blocks i {
+    display: block;
+    height: 14px;
+    background: var(--track);
+    border-radius: 1px;
+    transition: background-color .22s ease;
+  }
+  .blocks i[data-on="1"] { background: var(--sage-mid); }
+  .blocks i[data-phase-start="1"] { box-shadow: inset 2px 0 0 var(--ground); }
+
+  .status-foot {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: .875rem;
+    color: var(--ink-3);
+  }
+  .status-foot p { margin: 0; }
+
+  /* ---------- phase sections ---------- */
+  .phases { margin-top: clamp(36px, 5vw, 52px); display: flex; flex-direction: column; gap: 40px; }
+  .phase { border-top: 2px solid var(--ink); padding-top: 18px; }
+  .phase-head {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 8px 14px;
+  }
+  .phase-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--accent-text);
+    letter-spacing: .02em;
+  }
+  .phase-head h2 {
+    font-size: clamp(1.125rem, 2.6vw, 1.3125rem);
+    font-weight: 600;
+    letter-spacing: -.012em;
+  }
+  .phase-meta {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+  .tally {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: .875rem;
+    color: var(--ink-2);
+  }
+  .pill {
+    font-size: .69rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-2);
+    background: var(--surface);
+  }
+  .phase[data-state="progress"] .pill { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+  .phase[data-state="done"] .pill { border-color: var(--sage-mid); background: var(--sage-soft); color: var(--sage); }
+  .phase-rail {
+    margin-top: 14px;
+    height: 3px;
+    background: var(--track);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .phase-rail b {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--sage-mid);
+    transition: width .25s ease;
+  }
+  .phase-note {
+    margin: 12px 0 0;
+    font-size: .9375rem;
+    color: var(--ink-3);
+    max-width: 64ch;
+  }
+
+  /* ---------- tasks ---------- */
+  .tasks { list-style: none; margin: 6px 0 0; padding: 0; }
+  .task {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 0 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .task:last-child { border-bottom: none; }
+  .task input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 3px 0 0;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    background: var(--ground);
+    border: 1.5px solid var(--rule-strong);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+  .task input[type="checkbox"]:hover { border-color: var(--accent); }
+  .task input[type="checkbox"]:checked { background: var(--sage); border-color: var(--sage); }
+  .task input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 5px; top: 3px;
+    width: 6px; height: 10px;
+    border: solid var(--ground);
+    border-width: 0 2px 2px 0;
+    transform: rotate(42deg);
+  }
+  :root[data-theme="dark"] .task input[type="checkbox"]:checked::after,
+  :root:not([data-theme="light"]) .task input[type="checkbox"]:checked::after { border-color: var(--ground); }
+  .task input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
+  .task label { cursor: pointer; display: block; }
+  .task .t-name {
+    display: block;
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -.006em;
+  }
+  .task .t-desc {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink-2);
+    font-size: .9375rem;
+    max-width: 66ch;
+  }
+  .task .t-opt {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .66rem;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1px 5px;
+    margin-left: 8px;
+    vertical-align: 2px;
+    white-space: nowrap;
+  }
+  .task input:checked ~ label .t-name { color: var(--ink-3); }
+  .task input:checked ~ label .t-name::after {
+    content: " verified";
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .66rem;
+    font-weight: 500;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--sage);
+  }
+  .task input:checked ~ label .t-desc { color: var(--ink-3); }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .84em;
+    background: var(--surface-2);
+    color: var(--accent-text);
+    border-radius: 2px;
+    padding: .1em .34em;
+    word-break: break-word;
+  }
+
+
+  /* ---------- automation profile ---------- */
+  .auto { margin-top: clamp(32px, 4.5vw, 44px); }
+  .auto-head h2 {
+    font-size: clamp(1.25rem, 3vw, 1.5rem);
+    font-weight: 600;
+    letter-spacing: -.016em;
+  }
+  .auto-head p { margin: 8px 0 0; max-width: 62ch; font-size: .9375rem; color: var(--ink-2); }
+  .auto-figures {
+    margin-top: 22px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .fig { background: var(--ground); padding: 18px 18px 20px; }
+  .fig b {
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.03em;
+    color: var(--ink);
+  }
+  .fig-label {
+    display: inline-block;
+    margin-top: 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .68rem;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+  }
+  .fig p { margin: 10px 0 0; font-size: .875rem; color: var(--ink-2); }
+  /* class treatments, shared by figures, badges and mix cells */
+  .fig[data-class="automated"] .fig-label,
+  .t-class { background: var(--sage-soft); color: var(--sage); }
+  .fig[data-class="assisted"] .fig-label,
+  .task[data-class="assisted"] .t-class { background: var(--accent-soft); color: var(--accent-text); }
+  .fig[data-class="human"] .fig-label,
+  .task[data-class="human"] .t-class { background: var(--accent-ink); color: var(--surface); }
+  :root[data-theme="dark"] .fig[data-class="human"] .fig-label,
+  :root[data-theme="dark"] .task[data-class="human"] .t-class,
+  :root:not([data-theme="light"]) .fig[data-class="human"] .fig-label,
+  :root:not([data-theme="light"]) .task[data-class="human"] .t-class {
+    background: var(--rule-strong); color: var(--ground);
+  }
+
+  .mix { margin-top: 18px; display: flex; flex-direction: column; gap: 2px; }
+  .mix-row {
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 1fr) 7.5rem auto;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: .875rem;
+  }
+  .mix-row:last-child { border-bottom: none; }
+  .mix-num { font-family: "IBM Plex Mono", monospace; font-size: .8125rem; color: var(--accent-text); }
+  .mix-name { color: var(--ink); font-weight: 500; }
+  .mix-bar { display: flex; gap: 2px; }
+  .mix-bar i { display: block; width: 100%; height: 10px; border-radius: 1px; flex: 1 1 0; }
+  .mix-bar i[data-class="automated"] { background: var(--sage-mid); }
+  .mix-bar i[data-class="assisted"] { background: var(--accent); }
+  .mix-bar i[data-class="human"] { background: var(--accent-ink); }
+  :root[data-theme="dark"] .mix-bar i[data-class="human"],
+  :root:not([data-theme="light"]) .mix-bar i[data-class="human"] { background: var(--rule-strong); }
+  .mix-count {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .75rem;
+    letter-spacing: .02em;
+    color: var(--ink-3);
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  /* ---------- task: class badge, role, mechanism ---------- */
+  .t-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 14px;
+  }
+  .t-head .t-name { flex: 1 1 16rem; }
+  .t-class {
+    flex: none;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .66rem;
+    font-weight: 500;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .t-role, .t-mech { grid-column: 2; }
+  .t-role {
+    margin: 8px 0 0;
+    font-size: .875rem;
+    color: var(--ink-2);
+    max-width: 66ch;
+  }
+  .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .66rem;
+    font-weight: 500;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-right: 8px;
+  }
+  .t-mech { margin-top: 8px; }
+  .t-mech summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    cursor: pointer;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    list-style: none;
+    padding: 2px 0;
+  }
+  .t-mech summary::-webkit-details-marker { display: none; }
+  .t-mech summary::before {
+    content: "";
+    width: 0; height: 0;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform .15s ease;
+  }
+  .t-mech[open] summary::before { transform: rotate(90deg); }
+  .t-mech summary:hover { color: var(--accent-text); }
+  .t-mech summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+  .t-mech-body {
+    margin-top: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-left: 2px solid var(--rule-strong);
+    font-size: .875rem;
+    max-width: 72ch;
+  }
+  .t-mech-body p { margin: 0; color: var(--ink-2); }
+  .t-mech-body .t-note { margin-top: 8px; color: var(--ink-3); }
+  .task[data-class="assisted"] .t-mech-body { border-left-color: var(--accent); }
+  .task[data-class="human"] .t-mech-body { border-left-color: var(--ink-3); }
+
+
+  /* ---------- demo mode: switch, banner, per-task state ---------- */
+  .demo-bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 0 -20px 18px;
+    padding: 9px 20px;
+    background: var(--accent-ink);
+    color: var(--surface);
+    font-size: .8125rem;
+    line-height: 1.4;
+  }
+  .demo-tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 2px;
+    padding: 2px 6px;
+    margin-right: 8px;
+    white-space: nowrap;
+  }
+  .viewswitch {
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+  .viewswitch-h {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .68rem;
+    font-weight: 500;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  .seg-opt { display: flex; }
+  .seg input {
+    position: absolute;
+    width: 1px; height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .seg label {
+    cursor: pointer;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--ink-2);
+    padding: 6px 12px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+  }
+  .seg label:hover { color: var(--accent-text); }
+  .seg input:checked + label {
+    background: var(--ground);
+    border-color: var(--rule-strong);
+    color: var(--ink);
+  }
+  .seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .demo-intro {
+    margin-top: 22px;
+    padding: 20px 22px;
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+  }
+  .demo-intro h2 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .demo-intro p { margin: 10px 0 0; font-size: .9375rem; color: var(--ink-2); max-width: 66ch; }
+  .demo-intro-meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .72rem !important;
+    letter-spacing: .02em;
+    color: var(--ink-3) !important;
+  }
+
+  .st-ledger {
+    margin: 14px 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: .8125rem;
+    color: var(--ink-2);
+  }
+  .st-ledger span { display: inline-flex; align-items: center; gap: 7px; }
+  .st-ledger i {
+    width: 9px; height: 9px; flex: none;
+    border-radius: 1px;
+    background: var(--rule-strong);
+  }
+  .st-ledger span[data-st="done"] i { background: var(--sage-mid); }
+  .st-ledger span[data-st="progress"] i { background: var(--accent); }
+  .st-ledger span[data-st="blocked"] i { background: var(--accent-ink); border: 1px solid var(--ink-3); }
+  .st-ledger b { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; color: var(--ink); font-weight: 600; }
+  .ro-note { margin: 10px 0 0; width: 100%; font-size: .8125rem; color: var(--ink-3); }
+
+  /* remaining-work split (demo only) */
+  .split { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule); }
+  .split h3 { font-size: 1rem; font-weight: 600; letter-spacing: -.008em; }
+  .split-figs {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .split-fig { padding: 14px 16px; background: var(--surface); border-radius: 3px; border-left: 3px solid var(--rule-strong); }
+  .split-fig[data-side="sparq"] { border-left-color: var(--accent-ink); }
+  .split-fig[data-side="client"] { border-left-color: var(--sage-mid); }
+  .split-fig[data-side="blocked"] { border-left-color: var(--accent); }
+  .split-fig b {
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .split-fig span {
+    display: block;
+    margin-top: 6px;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .split-fig p { margin: 6px 0 0; font-size: .8125rem; color: var(--ink-2); }
+  .split-note { margin: 14px 0 0; font-size: .875rem; color: var(--ink-3); }
+
+  /* per-task demo block */
+  .t-demo { grid-column: 2; margin-top: 10px; }
+  .t-meta {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    padding: 7px 10px;
+    background: var(--surface);
+    border-left: 2px solid var(--rule-strong);
+    border-radius: 0 2px 2px 0;
+    font-size: .8125rem;
+  }
+  .t-demo[data-st="done"] .t-meta { border-left-color: var(--sage-mid); }
+  .t-demo[data-st="progress"] .t-meta { border-left-color: var(--accent); }
+  .t-demo[data-st="blocked"] .t-meta { border-left-color: var(--accent-ink); background: var(--surface-2); }
+  .st {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .st::before {
+    content: "";
+    width: 9px; height: 9px;
+    border-radius: 1px;
+    background: var(--rule-strong);
+  }
+  .t-demo[data-st="done"] .st::before { background: var(--sage-mid); }
+  .t-demo[data-st="progress"] .st::before { background: var(--accent); }
+  .t-demo[data-st="blocked"] .st::before { background: var(--accent-ink); box-shadow: 0 0 0 1px var(--ink-3); }
+  .own { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-2); white-space: nowrap; }
+  .org {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+  .own[data-side="sparq"] .org { background: var(--accent-ink); color: var(--surface); }
+  .own[data-side="client"] .org { background: transparent; color: var(--ink-2); border: 1px solid var(--rule-strong); padding: 1px 5px; }
+  :root[data-theme="dark"] .own[data-side="sparq"] .org,
+  :root:not([data-theme="light"]) .own[data-side="sparq"] .org { background: var(--rule-strong); color: var(--ground); }
+  .when {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .72rem;
+    letter-spacing: .02em;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .t-ev { margin: 8px 0 0; font-size: .875rem; color: var(--ink-2); max-width: 70ch; }
+
+  /* demo is read-only: make the disabled checkbox read as state, not a dead control */
+  .task input[type="checkbox"]:disabled { cursor: default; opacity: 1; }
+  .task input[type="checkbox"]:disabled:not(:checked) { background: var(--surface-2); border-style: dashed; }
+  #app[data-mode="demo"] .task label { cursor: default; }
+
+  /* ---------- controls / footer ---------- */
+  .btn {
+    font: inherit;
+    font-size: .8125rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--ink-2);
+    background: var(--ground);
+    border: 1px solid var(--rule-strong);
+    border-radius: 3px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent-text); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .btn[data-armed="1"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .reset-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .reset-hint { font-size: .8125rem; color: var(--ink-3); }
+
+  footer {
+    margin-top: 52px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: .8125rem;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    justify-content: space-between;
+  }
+  footer p { margin: 0; max-width: 60ch; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  @media (max-width: 560px) {
+    .demo-bar { margin-inline: -20px; }
+    .t-meta { gap: 4px 12px; }
+    .mix-row { grid-template-columns: 2.2rem minmax(0, 1fr); }
+    .mix-bar { grid-column: 1 / -1; }
+    .mix-count { grid-column: 1 / -1; text-align: left; }
+    .phase-head { grid-template-columns: auto 1fr; }
+    .phase-meta { grid-column: 1 / -1; grid-row: 2; }
+    .blocks { gap: 2px; }
+    .blocks i { height: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+</head>
+<body>
+<div class="page" id="app" data-mode="blank">
+  <p class="demo-bar" id="demo-bar" hidden><span class="demo-tag">Illustrative demo</span> Generica Clearing Partners is a fictional engagement, shown read-only. Nothing here is a real client record.</p>
+  <header>
+    <div class="brand">
+      <span class="mark" aria-hidden="true">S</span>
+      <span>Sparq</span>
+      <span class="sep" aria-hidden="true">/</span>
+      <span>Compliance Engineering</span>
+    </div>
+    <h1>GCP Immutable Ledger &amp; WORM Implementation</h1>
+    <p class="lede">The nineteen controls that take a Google Cloud audit trail from &ldquo;logs exist&rdquo; to write-once, cryptographically provable and independently verifiable. Tick items as they land to see readiness build, phase by phase.</p>
+    <ul class="standards">
+      <li>SEC 17a-4</li>
+      <li>FINRA 4511</li>
+      <li>GDPR / CCPA</li>
+      <li>FIPS 140-2 Level 3</li>
+      <li>RFC 3161</li>
+      <li>OTel GenAI</li>
+    </ul>
+
+    <div class="viewswitch" role="radiogroup" aria-labelledby="viewswitch-h">
+      <span class="viewswitch-h" id="viewswitch-h">View</span>
+      <div class="seg">
+        <span class="seg-opt">
+          <input type="radio" name="viewmode" id="mode-blank" value="blank" checked>
+          <label for="mode-blank">Blank checklist</label>
+        </span>
+        <span class="seg-opt">
+          <input type="radio" name="viewmode" id="mode-demo" value="demo">
+          <label for="mode-demo">Demo: Generica Clearing Partners</label>
+        </span>
+      </div>
+    </div>
+
+    <div class="demo-intro" id="demo-intro" hidden>
+      <h2>Sample engagement &middot; Generica Clearing Partners</h2>
+      <p>Generica Clearing Partners is a mid-size broker-dealer, around 800 staff, running clearing and custody on Google Cloud. This spring they put an AI assistant in front of advisors to draft client communications, which turned every prompt, retrieved document and generated message into a business record they must retain immutably under SEC 17a-4(f) and FINRA 4511.</p>
+      <p class="demo-intro-meta">Engagement opened Jul 2, 2026 &middot; state shown as of Sep 11, 2026 &middot; fictional example, read-only</p>
+    </div>
+  </header>
+
+  <section class="status" aria-labelledby="status-h">
+    <h2 class="sr-only" id="status-h">Overall readiness</h2>
+    <div class="status-top">
+      <div>
+        <p class="count"><b id="done-count">0</b><span>/ 19</span></p>
+        <span class="count-label" id="overall-text">controls verified</span>
+      </div>
+      <p class="pct"><span id="overall-pct">0%</span><small>ready</small></p>
+    </div>
+    <div class="blocks" id="blocks" role="img" aria-label="One cell per control, filled when verified">
+      <i data-phase-start="1"></i><i></i><i></i><i></i><i></i>
+      <i data-phase-start="1"></i><i></i><i></i><i></i>
+      <i data-phase-start="1"></i><i></i><i></i><i></i><i></i>
+      <i data-phase-start="1"></i><i></i><i></i><i></i><i></i>
+    </div>
+    <p class="st-ledger" id="st-ledger" hidden></p>
+    <div class="status-foot">
+      <p id="phase-summary">Phase 1 &middot; 0/5 &nbsp; Phase 2 &middot; 0/4 &nbsp; Phase 3 &middot; 0/5 &nbsp; Phase 4 &middot; 0/5</p>
+      <div class="reset-wrap" id="reset-wrap">
+        <span class="reset-hint" id="reset-hint" hidden>This clears every tick.</span>
+        <button class="btn" type="button" id="reset-btn">Reset progress</button>
+      </div>
+      <p class="ro-note" id="ro-note" hidden>Demo view is read-only &mdash; switch to the blank checklist to record your own progress.</p>
+    </div>
+    <p class="sr-only" role="status" aria-live="polite" id="live"></p>
+  </section>
+
+
+  <section class="auto" aria-labelledby="auto-h">
+    <div class="auto-head">
+      <h2 id="auto-h">How much of this runs itself</h2>
+      <p>Every control is classified by what it costs the client once it is live &mdash; not by how hard it is to build.</p>
+    </div>
+    <div class="auto-figures">
+      <div class="fig" data-class="automated">
+        <b>12</b>
+        <span class="fig-label">Automated</span>
+        <p>Run on every record with no human in the loop &mdash; Terraform, CI assertions and scheduled Cloud Run jobs.</p>
+      </div>
+      <div class="fig" data-class="assisted">
+        <b>6</b>
+        <span class="fig-label">Assisted</span>
+        <p>Automated mechanics, but a named person decides the policy once at setup and revisits it on change.</p>
+      </div>
+      <div class="fig" data-class="human">
+        <b>1</b>
+        <span class="fig-label">Human sign-off</span>
+        <p>Locking the retention window is irreversible, so a compliance officer attests and authorizes it.</p>
+      </div>
+    </div>
+    <div class="split" id="demo-split" hidden>
+      <h3>Of the ten controls still open</h3>
+      <div class="split-figs">
+        <div class="split-fig" data-side="sparq"><b>6</b><span>Sparq builds it</span><p>Terraform, pipeline code and CI assertions &mdash; no Generica time needed beyond review.</p></div>
+        <div class="split-fig" data-side="client"><b>4</b><span>Generica decides it</span><p>A retention attestation, a bucket-lock approval, a TSA contract and alert triage ownership.</p></div>
+        <div class="split-fig" data-side="blocked"><b>2</b><span>Blocked today</span><p>The retention attestation and the timestamping-authority contract, both waiting inside Generica.</p></div>
+      </div>
+      <p class="split-note">Across all 19 controls, 15 are Sparq-owned and 4 sit with Generica.</p>
+    </div>
+    <div class="mix" role="group" aria-label="Automation mix by phase">
+        <div class="mix-row">
+          <span class="mix-num" aria-hidden="true">01</span>
+          <span class="mix-name">Governance, IAM &amp; Risk Safeguards</span>
+          <span class="mix-bar" aria-hidden="true"><i data-class="automated"></i><i data-class="automated"></i><i data-class="automated"></i><i data-class="automated"></i><i data-class="assisted"></i></span>
+          <span class="mix-count">4 automated &middot; 1 assisted</span>
+        </div>
+        <div class="mix-row">
+          <span class="mix-num" aria-hidden="true">02</span>
+          <span class="mix-name">Storage &amp; Ingestion Pipeline</span>
+          <span class="mix-bar" aria-hidden="true"><i data-class="automated"></i><i data-class="assisted"></i><i data-class="assisted"></i><i data-class="human"></i></span>
+          <span class="mix-count">1 automated &middot; 2 assisted &middot; 1 sign-off</span>
+        </div>
+        <div class="mix-row">
+          <span class="mix-num" aria-hidden="true">03</span>
+          <span class="mix-name">Cryptographic Ledger &amp; Anchoring</span>
+          <span class="mix-bar" aria-hidden="true"><i data-class="automated"></i><i data-class="automated"></i><i data-class="automated"></i><i data-class="assisted"></i><i data-class="assisted"></i></span>
+          <span class="mix-count">3 automated &middot; 2 assisted</span>
+        </div>
+        <div class="mix-row">
+          <span class="mix-num" aria-hidden="true">04</span>
+          <span class="mix-name">Verification &amp; Operational Testing</span>
+          <span class="mix-bar" aria-hidden="true"><i data-class="automated"></i><i data-class="automated"></i><i data-class="automated"></i><i data-class="automated"></i><i data-class="assisted"></i></span>
+          <span class="mix-count">4 automated &middot; 1 assisted</span>
+        </div>
+    </div>
+  </section>
+
+  <div class="phases">
+    <section class="phase" data-phase="1" data-state="none" aria-labelledby="p1-h">
+      <div class="phase-head">
+        <span class="phase-num" aria-hidden="true">01</span>
+        <h2 id="p1-h">Governance, IAM &amp; Risk Safeguards</h2>
+        <div class="phase-meta">
+          <span class="tally"><span class="t-done">0</span>/5</span>
+          <span class="pill">Not started</span>
+        </div>
+      </div>
+      <div class="phase-rail" aria-hidden="true"><b></b></div>
+      <p class="phase-note">Decide what is allowed into permanent storage, and who can touch it, before anything becomes undeletable.</p>
+      <ul class="tasks">
+        <li class="task" data-class="assisted">
+          <input type="checkbox" id="task-1">
+          <label for="task-1"><span class="t-head"><span class="t-name">Sanitize upstream of ingestion</span><span class="t-class"><span class="sr-only">Automation: </span>Assisted</span></span><span class="t-desc">Redact PII and PHI automatically before records enter the pipeline, so privacy data is never locked beyond the reach of a GDPR or CCPA erasure request.</span></label>
+          <p class="t-role"><span class="k">Your team</span>Privacy counsel sets infoType scope and redaction-versus-tokenization policy.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Sensitive Data Protection <code>deidentifyContent</code> driven by stored inspection and de-identification templates, called inline from the ingestion service or via the Dataflow DLP-to-BigQuery template; infoType detectors and transformations are declarative.</p><p class="t-note"><span class="k">Watch for</span>Redaction missed here is unfixable: once inside a locked bucket the data cannot be erased for a GDPR or CCPA request.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-2">
+          <label for="task-2"><span class="t-head"><span class="t-name">Filter what gets logged</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Route by log level so debug output and ephemeral traces never reach the high-cost locked buckets.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Cloud Logging sink inclusion and exclusion filters in Terraform <code>google_logging_organization_sink</code> (<code>filter</code>, <code>exclusions</code>) using severity predicates; fully deterministic and diffable in code review.</p><p class="t-note"><span class="k">Watch for</span>Over-aggressive exclusion silently destroys evidence, so filters belong in version control and code review, never in a console edit.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-3">
+          <label for="task-3"><span class="t-head"><span class="t-name">Isolate the compliance project</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Point every organization-level audit sink at one dedicated security and compliance GCP project, separate from workload projects.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Aggregated <code>google_logging_organization_sink</code> with <code>include_children = true</code> pointed at one dedicated project, provisioned by a Terraform project factory; Org Policy pins the destination.</p><p class="t-note"><span class="k">Watch for</span>The separation is only real if workload-project admins hold no IAM on the compliance project.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-4">
+          <label for="task-4"><span class="t-head"><span class="t-name">Restrict IAM to append-only</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Grant the ingestion identity only appends (<code>logging.logEntries.create</code>, <code>bigquery.tables.updateData</code>) and withhold <code>bigquery.jobs.create</code> &mdash; mutating DML runs as a query job while the Storage Write API does not, so denying job creation is the lever that keeps the tier append-only.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p><code>google_organization_iam_custom_role</code> with an explicit permission allowlist (<code>logging.logEntries.create</code>, <code>bigquery.tables.updateData</code>), backstopped by IAM v2 deny policies (<code>policies.createPolicy</code>), asserted pre-deploy with Policy Simulator in CI.</p><p class="t-note"><span class="k">Watch for</span>Withhold <code>bigquery.jobs.create</code> from the ingestion identity: DML runs as a query job, the Storage Write API does not, so appends survive.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-5">
+          <label for="task-5"><span class="t-head"><span class="t-name">Apply organizational liens</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Attach Resource Manager liens to the containing projects so no one can delete a project while locked buckets still live in it.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Resource Manager liens via <code>POST cloudresourcemanager.googleapis.com/v3/liens</code> with <code>restrictions: [resourcemanager.projects.delete]</code>, or Terraform <code>google_resource_manager_lien</code>; the caller needs <code>resourcemanager.projects.updateLiens</code>.</p><p class="t-note"><span class="k">Watch for</span>A lien is reversible by anyone holding <code>resourcemanager.projects.updateLiens</code>, so deny that permission or the safeguard can remove itself.</p></div>
+          </details>
+        </li>
+      </ul>
+    </section>
+
+    <section class="phase" data-phase="2" data-state="none" aria-labelledby="p2-h">
+      <div class="phase-head">
+        <span class="phase-num" aria-hidden="true">02</span>
+        <h2 id="p2-h">Storage &amp; Ingestion Pipeline</h2>
+        <div class="phase-meta">
+          <span class="tally"><span class="t-done">0</span>/4</span>
+          <span class="pill">Not started</span>
+        </div>
+      </div>
+      <div class="phase-rail" aria-hidden="true"><b></b></div>
+      <p class="phase-note">Stand up the write-once tiers and the append-only path that feeds them.</p>
+      <ul class="tasks">
+        <li class="task" data-class="human">
+          <input type="checkbox" id="task-6">
+          <label for="task-6"><span class="t-head"><span class="t-name">Provision the long-term WORM tier</span><span class="t-class"><span class="sr-only">Automation: </span>Human sign-off</span></span><span class="t-desc">Configure a Cloud Storage bucket with Object Retention Lock or Bucket Lock set to the retention window your regulator requires, for example SEC 17a-4 or FINRA.</span></label>
+          <p class="t-role"><span class="k">Your team</span>Compliance officer attests the retention window under SEC 17a-4(f) and authorizes the lock.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Terraform <code>google_storage_bucket</code> with <code>retention_policy { retention_period, is_locked }</code>, or the JSON API <code>buckets.lockRetentionPolicy</code>; per-object mode needs a bucket created with <code>--enable-per-object-retention</code>, then retention mode <code>Locked</code>.</p><p class="t-note"><span class="k">Watch for</span>Locking is irreversible: the period can only be increased, never shortened or removed, and the bucket cannot be deleted until every object ages out.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-7">
+          <label for="task-7"><span class="t-head"><span class="t-name">Deploy the append-only analytical tier</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Back BigQuery tables with the Storage Write API in committed stream mode, tracking stream-level offsets for sub-second, exactly-once delivery.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Terraform <code>google_bigquery_table</code> plus a client calling <code>CreateWriteStream</code> with type <code>COMMITTED</code> and <code>AppendRows</code> carrying per-stream offsets; a retried offset returns <code>ALREADY_EXISTS</code> instead of duplicating the row.</p><p class="t-note"><span class="k">Watch for</span>Committed-stream rows are queryable as soon as BigQuery acknowledges the append, so offsets deliver exactly-once without any staging table.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="assisted">
+          <input type="checkbox" id="task-8">
+          <label for="task-8"><span class="t-head"><span class="t-name">Lock the Cloud Logging buckets</span><span class="t-class"><span class="sr-only">Automation: </span>Assisted</span></span><span class="t-desc">Create custom log buckets with <code>--locked</code>, and turn on <code>--enable-analytics</code> so auditors can query them directly with BigQuery SQL.</span></label>
+          <p class="t-role"><span class="k">Your team</span>Security lead approves the irreversible bucket lock and the retention-day figure.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p><code>gcloud logging buckets create --locked --enable-analytics --retention-days</code>, or Terraform <code>google_logging_project_bucket_config</code> with <code>locked = true</code> and <code>enable_analytics = true</code>; both flags are one-way.</p><p class="t-note"><span class="k">Watch for</span>Locking and the Log Analytics opt-in cannot be undone, and a locked bucket resists deletion until every entry has aged out.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="assisted">
+          <input type="checkbox" id="task-9">
+          <label for="task-9"><span class="t-head"><span class="t-name">Standardize AI telemetry</span><span class="t-class"><span class="sr-only">Automation: </span>Assisted</span></span><span class="t-desc">Record system prompts, RAG context, tool inputs and outputs, model parameters and stop reasons as OpenTelemetry <code>gen_ai.*</code> attributes &mdash; and pin the convention version you emit, because these conventions are still Development status with no Stable attributes.</span></label>
+          <p class="t-role"><span class="k">Your team</span>Engineer decides which prompt, RAG and tool payloads are safe to persist immutably.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>OpenTelemetry SDK emitting <code>gen_ai.*</code> semantic-convention attributes over OTLP into Cloud Trace and Cloud Logging; the conventions remain Development status, gated behind <code>OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental</code>.</p><p class="t-note"><span class="k">Watch for</span>No GenAI attribute is Stable yet, so pin the version — and capturing raw prompts collides directly with task-1's redaction scope.</p></div>
+          </details>
+        </li>
+      </ul>
+    </section>
+
+    <section class="phase" data-phase="3" data-state="none" aria-labelledby="p3-h">
+      <div class="phase-head">
+        <span class="phase-num" aria-hidden="true">03</span>
+        <h2 id="p3-h">Cryptographic Ledger &amp; Anchoring</h2>
+        <div class="phase-meta">
+          <span class="tally"><span class="t-done">0</span>/5</span>
+          <span class="pill">Not started</span>
+        </div>
+      </div>
+      <div class="phase-rail" aria-hidden="true"><b></b></div>
+      <p class="phase-note">Make every record provably in sequence and provably signed, so tampering shows up as broken maths rather than a judgement call.</p>
+      <ul class="tasks">
+        <li class="task" data-class="assisted">
+          <input type="checkbox" id="task-10">
+          <label for="task-10"><span class="t-head"><span class="t-name">Provision key management</span><span class="t-class"><span class="sr-only">Automation: </span>Assisted</span></span><span class="t-desc">Initialize Cloud KMS backed by Cloud HSM (FIPS 140-2 Level 3) with asymmetric signing keys, for example <code>EC_SIGN_P256_SHA256</code>.</span></label>
+          <p class="t-role"><span class="k">Your team</span>Key custodian signs off protection level, rotation and signer/verifier separation of duties.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Terraform <code>google_kms_crypto_key</code> with <code>purpose = ASYMMETRIC_SIGN</code> and <code>version_template { algorithm = EC_SIGN_P256_SHA256, protection_level = HSM }</code> through <code>projects.locations.keyRings.cryptoKeys.create</code>, on FIPS 140-2 Level 3 Cloud HSM.</p><p class="t-note"><span class="k">Watch for</span>Google-generated HSM keys need no ceremony — the private key never leaves the HSM. A real ceremony applies only to material imported via <code>importJobs</code>.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-11">
+          <label for="task-11"><span class="t-head"><span class="t-name">Build the hash chaining engine</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Hash each payload with SHA-256 in canonical JSON form inside the ingestion runtime, chaining every record to the one before it.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Application code in the ingestion runtime (Cloud Run): RFC 8785 canonical JSON, SHA-256, and a <code>prev_hash</code> column carried in the table schema; golden-vector unit tests in Cloud Build.</p><p class="t-note"><span class="k">Watch for</span>Pin the canonicalization spec and sequence writes per stream — a re-serialization change or a concurrent append breaks the chain retroactively.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-12">
+          <label for="task-12"><span class="t-head"><span class="t-name">Automate digital signing</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Have the pipeline sign each block digest through Cloud KMS <code>asymmetricSign</code> before the record is committed.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p><code>projects.locations.keyRings.cryptoKeys.cryptoKeyVersions.asymmetricSign</code> in digest mode, called by the ingestion service holding <code>roles/cloudkms.signer</code>, before the committed-stream append is made.</p><p class="t-note"><span class="k">Watch for</span>Sign Merkle roots, not individual records: <code>asymmetricSign</code> is billed and rate-limited per call, so batching is what makes this affordable at volume.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-13">
+          <label for="task-13"><span class="t-head"><span class="t-name">Schedule batch compliance export</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Run a serverless job, such as Cloud Run, that periodically extracts finalized ledger partitions, converts them to compressed Parquet or JSON, and writes them to the locked GCS buckets.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Cloud Scheduler triggering a Cloud Run job that runs BigQuery <code>EXPORT DATA</code> to compressed Parquet, or a table extract job, writing into the retention-locked GCS bucket.</p><p class="t-note"><span class="k">Watch for</span>Export object names must be idempotent: overwriting an object still under retention fails with <code>403 retentionPolicyNotMet</code>, so a blind retry hard-fails.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="assisted">
+          <input type="checkbox" id="task-14">
+          <label for="task-14"><span class="t-head"><span class="t-name">Anchor timestamps externally<span class="t-opt">Optional</span><span class="t-class"><span class="sr-only">Automation: </span>Assisted</span></span></span><span class="t-desc">Request RFC 3161 timestamps from an external Timestamping Authority over signed Merkle roots, for vendor-neutral time proof at scale.</span></label>
+          <p class="t-role"><span class="k">Your team</span>Counsel selects and contracts a TSA whose tokens the regulator will accept.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>No native GCP timestamping authority exists. The RFC 3161 client automates fully (TSP request over the signed Merkle root, token stored alongside it); the authority itself is a third-party contract.</p><p class="t-note"><span class="k">Watch for</span>Self-hosting a TSA such as sigstore/timestamp-authority is trivial on Cloud Run but forfeits the third-party neutrality that makes the anchor worth having.</p></div>
+          </details>
+        </li>
+      </ul>
+    </section>
+
+    <section class="phase" data-phase="4" data-state="none" aria-labelledby="p4-h">
+      <div class="phase-head">
+        <span class="phase-num" aria-hidden="true">04</span>
+        <h2 id="p4-h">Verification &amp; Operational Testing</h2>
+        <div class="phase-meta">
+          <span class="tally"><span class="t-done">0</span>/5</span>
+          <span class="pill">Not started</span>
+        </div>
+      </div>
+      <div class="phase-rail" aria-hidden="true"><b></b></div>
+      <p class="phase-note">Prove the controls hold by attacking them, and keep watching once they do.</p>
+      <ul class="tasks">
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-15">
+          <label for="task-15"><span class="t-head"><span class="t-name">Run independent verification</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Keep an isolated verifier, for example <code>verify_ledger.py</code>, that pulls records and KMS public keys and re-checks sequential hash continuity and every signature.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Cloud Scheduler plus a Cloud Run job in a separate project running the verifier, reading through the BigQuery Storage Read API and <code>cryptoKeyVersions.getPublicKey</code> with only <code>roles/cloudkms.publicKeyViewer</code>.</p><p class="t-note"><span class="k">Watch for</span>Give the verifier its own project and a read-only identity, or it inherits the very trust it exists to test independently.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-16">
+          <label for="task-16"><span class="t-head"><span class="t-name">Test BigQuery immutability</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Fire adversarial <code>DELETE</code> and <code>UPDATE</code> statements at the analytical ledger using admin credentials, and confirm IAM refuses them.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Cloud Build step issuing <code>bq query</code> DELETE and UPDATE as a deliberately privileged service account and asserting <code>accessDenied</code>; re-run on a Cloud Scheduler cadence, with Policy Simulator checks pre-deploy.</p><p class="t-note"><span class="k">Watch for</span>This is the test that catches task-4 drift, because a role granting appends can also authorize mutating DML if job creation is allowed.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-17">
+          <label for="task-17"><span class="t-head"><span class="t-name">Test GCS WORM enforcement</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Attempt deletions with <code>gcloud storage rm</code> against still-retained objects and confirm each is refused with <code>403 retentionPolicyNotMet</code> &mdash; assert on that reason code, not on <code>412 Precondition Failed</code> or on exit status alone.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>CI job asserting that <code>gcloud storage rm</code> exits non-zero against a still-retained object, matching on the returned reason code rather than on exit status alone.</p><p class="t-note"><span class="k">Watch for</span>The real failure is HTTP 403 <code>retentionPolicyNotMet</code>, not 412 Precondition Failed — assert on that reason code, not the checklist's wording.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="automated">
+          <input type="checkbox" id="task-18">
+          <label for="task-18"><span class="t-head"><span class="t-name">Validate tamper detection</span><span class="t-class"><span class="sr-only">Automation: </span>Automated</span></span><span class="t-desc">Inject modified historical payloads into a test dataset and confirm the verifier flags the hash corruption and the break in the sequence chain.</span></label>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>Cloud Build job seeding a mutated fixture into a disposable non-production dataset, then asserting the verifier exits non-zero and names the expected broken offset in the chain.</p><p class="t-note"><span class="k">Watch for</span>Run this only against a throwaway dataset: injecting tampered payloads into the real locked ledger is itself an unremovable audit event.</p></div>
+          </details>
+        </li>
+        <li class="task" data-class="assisted">
+          <input type="checkbox" id="task-19">
+          <label for="task-19"><span class="t-head"><span class="t-name">Establish automated monitoring</span><span class="t-class"><span class="sr-only">Automation: </span>Assisted</span></span><span class="t-desc">Alert in real time through Cloud Monitoring on any signature verification failure or detected sequence gap.</span></label>
+          <p class="t-role"><span class="k">Your team</span>On-call engineer judges whether a failure is corruption, key rotation drift, or breach.</p>
+          <details class="t-mech">
+            <summary>Mechanism</summary>
+            <div class="t-mech-body"><p>The verifier emits a log-based or custom metric; <code>google_monitoring_alert_policy</code> with notification channels fires on any signature failure or sequence gap, optionally surfaced in Security Command Center.</p><p class="t-note"><span class="k">Watch for</span>A signature failure is not self-explaining — canonicalization changes and key rotation produce the identical signal, and the wrong call triggers regulator notification.</p></div>
+          </details>
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <footer>
+    <p>Readiness is tracked in this browser only &mdash; your ticks stay on your device and are not shared with other viewers. The Generica Clearing Partners demo is a fictional engagement, kept separate from your own progress.</p>
+    <p class="mono">Sparq &middot; 19 controls &middot; 4 phases &middot; 12 automated</p>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    "use strict";
+    document.documentElement.lang = "en";
+
+    var KEY = "gcp_worm_checklist_state";
+    var boxes = Array.prototype.slice.call(document.querySelectorAll(".task input[type=checkbox]"));
+    var cells = Array.prototype.slice.call(document.querySelectorAll("#blocks i"));
+    var phases = Array.prototype.slice.call(document.querySelectorAll(".phase"));
+    var live = document.getElementById("live");
+    var resetBtn = document.getElementById("reset-btn");
+    var resetHint = document.getElementById("reset-hint");
+    var armed = false;
+    var announceTimer = null;
+
+    function store() {
+      try { return window.localStorage; } catch (e) { return null; }
+    }
+
+    function load() {
+      var ls = store();
+      if (!ls) return;
+      var raw;
+      try { raw = ls.getItem(KEY); } catch (e) { return; }
+      if (!raw) return;
+      try {
+        var state = JSON.parse(raw);
+        boxes.forEach(function (cb) {
+          if (state && Object.prototype.hasOwnProperty.call(state, cb.id)) cb.checked = !!state[cb.id];
+        });
+      } catch (e) { /* corrupt value: start clean */ }
+    }
+
+    function save() {
+      if (mode === "demo") return;
+      var ls = store();
+      if (!ls) return;
+      var state = {};
+      boxes.forEach(function (cb) { state[cb.id] = cb.checked; });
+      try { ls.setItem(KEY, JSON.stringify(state)); } catch (e) { /* quota or blocked */ }
+    }
+
+    function render(announce) {
+      var done = 0;
+      boxes.forEach(function (cb, i) {
+        if (cb.checked) done++;
+        if (cells[i]) cells[i].setAttribute("data-on", cb.checked ? "1" : "0");
+      });
+      var total = boxes.length;
+      var pct = total ? Math.round((done / total) * 100) : 0;
+
+      document.getElementById("done-count").textContent = String(done);
+      document.getElementById("overall-pct").textContent = pct + "%";
+      document.getElementById("overall-text").textContent =
+        done === total ? "all controls verified" : "controls verified";
+
+      var parts = [];
+      phases.forEach(function (sec) {
+        var pb = Array.prototype.slice.call(sec.querySelectorAll("input[type=checkbox]"));
+        var pDone = pb.filter(function (cb) { return cb.checked; }).length;
+        var pTotal = pb.length;
+        sec.querySelector(".t-done").textContent = String(pDone);
+        sec.querySelector(".phase-rail b").style.width = (pTotal ? (pDone / pTotal) * 100 : 0) + "%";
+        var state = pDone === 0 ? "none" : (pDone === pTotal ? "done" : "progress");
+        sec.setAttribute("data-state", state);
+        sec.querySelector(".pill").textContent =
+          state === "none" ? "Not started" : (state === "done" ? "Complete" : "In progress");
+        parts.push("Phase " + sec.getAttribute("data-phase") + " · " + pDone + "/" + pTotal);
+      });
+      document.getElementById("phase-summary").innerHTML = parts.join(" &nbsp; ");
+
+      if (announce) {
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(function () {
+          live.textContent = done + " of " + total + " controls verified, " + pct + " percent ready.";
+        }, 220);
+      }
+    }
+
+    function disarm() {
+      armed = false;
+      resetBtn.removeAttribute("data-armed");
+      resetBtn.textContent = "Reset progress";
+      resetHint.hidden = true;
+    }
+
+    boxes.forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        if (mode === "demo") return;
+        own[cb.id] = cb.checked;
+        save();
+        render(true);
+      });
+    });
+
+    resetBtn.addEventListener("click", function () {
+      if (mode === "demo") return;
+      if (!armed) {
+        armed = true;
+        resetBtn.setAttribute("data-armed", "1");
+        resetBtn.textContent = "Confirm reset";
+        resetHint.hidden = false;
+        return;
+      }
+      boxes.forEach(function (cb) { cb.checked = false; own[cb.id] = false; });
+      var ls = store();
+      if (ls) { try { ls.removeItem(KEY); } catch (e) {} }
+      disarm();
+      render(false);
+      live.textContent = "Progress reset. 0 of " + boxes.length + " controls verified.";
+    });
+
+    resetBtn.addEventListener("blur", function () { if (armed) disarm(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && armed) disarm(); });
+
+
+    // ---- demo engagement (fictional: Generica Clearing Partners) ----
+    var DEMO = {"task-1": {"date": "Completed Jul 24, 2026", "ev": "DLP de-identification template <code>gnrc-dlp-advisor-pii</code> v3 and inspection template v2 merged in <code>terraform/modules/dlp-ingest</code> (PR #41); redaction policy memo PRIV-DLP-002 signed by counsel.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-10": {"date": "Completed Aug 21, 2026", "ev": "Key ring <code>gnrc-ledger-keys</code> (us-central1), key <code>ledger-signer-v1</code>, <code>EC_SIGN_P256_SHA256</code> at HSM protection level; custodian sign-off KEY-CUST-004 records signer/verifier separation of duties.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-11": {"date": "Completed Aug 28, 2026", "ev": "RFC 8785 canonicalization and a <code>prev_hash</code> column live in <code>ledger_events</code>; 120 golden vectors asserted in Cloud Build on every commit.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-12": {"date": "Completed Sep 1, 2026", "ev": "One Merkle root per 5,000-record batch signed through <code>asymmetricSign</code> before the append; steady state is roughly 480 signing calls per day.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-13": {"date": "Updated Sep 9, 2026", "ev": "Cloud Run job <code>ledger-export</code> on Cloud Scheduler at 02:00 UTC writing Parquet to <code>gs://gnrc-worm-ledger-prod/ledger/dt=YYYY-MM-DD/</code>; idempotent object names merged, retention-collision rerun test still outstanding.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "progress"}, "task-14": {"date": "Blocked since Aug 28, 2026", "ev": "RFC 3161 client prototyped against a candidate timestamping authority; the authority contract has been in legal review with Generica counsel since Aug 28.", "org": "Generica", "role": "counsel", "side": "client", "st": "blocked"}, "task-15": {"date": "Target Sep 25, 2026", "ev": "", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "none"}, "task-16": {"date": "Target Sep 25, 2026", "ev": "", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "none"}, "task-17": {"date": "Target Oct 2, 2026", "ev": "", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "none"}, "task-18": {"date": "Target Oct 9, 2026", "ev": "", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "none"}, "task-19": {"date": "Target Oct 16, 2026", "ev": "", "org": "Generica", "role": "security lead", "side": "client", "st": "none"}, "task-2": {"date": "Completed Jul 17, 2026", "ev": "Severity predicate <code>severity &gt;= NOTICE</code> plus six exclusion filters merged in <code>terraform/logging/org-sinks</code> (PR #38).", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-3": {"date": "Completed Jul 17, 2026", "ev": "Aggregated org sink <code>audit-all</code> with <code>include_children = true</code> landing in project <code>gnrc-compliance-prod</code>; access review confirms no workload-project admin holds IAM there.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-4": {"date": "Completed Jul 31, 2026", "ev": "Custom role <code>GnrcLedgerAppender</code> (two permissions) plus IAM deny policy <code>deny-ledger-query-jobs</code> withholding <code>bigquery.jobs.create</code>; Policy Simulator assertion green in Cloud Build since Jul 31.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-5": {"date": "Completed Aug 7, 2026", "ev": "Lien on <code>gnrc-compliance-prod</code> restricting <code>resourcemanager.projects.delete</code>; <code>resourcemanager.projects.updateLiens</code> denied outside the break-glass group.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-6": {"date": "Blocked since Aug 21, 2026", "ev": "Bucket <code>gnrc-worm-ledger-prod</code> provisioned with <code>retention_period = 2557d</code> (seven years) and <code>is_locked = false</code>; attestation RET-ATT-001 has been with Generica’s compliance officer since Aug 21.", "org": "Generica", "role": "compliance officer", "side": "client", "st": "blocked"}, "task-7": {"date": "Completed Aug 14, 2026", "ev": "<code>audit_ledger.ledger_events</code> in <code>gnrc-compliance-prod</code> fed by committed streams with per-stream offsets; a 21-day soak wrote 41.2M rows with zero duplicates across three forced retries.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "done"}, "task-8": {"date": "Updated Sep 4, 2026", "ev": "Log bucket <code>gnrc-audit-log-prod</code> created with <code>--enable-analytics</code> and <code>--retention-days=2557</code>; <code>--locked</code> deliberately held until RET-ATT-001 lands. Approval memo SEC-LOCK-003 drafted.", "org": "Generica", "role": "security lead", "side": "client", "st": "progress"}, "task-9": {"date": "Updated Sep 8, 2026", "ev": "OTel collector in <code>gnrc-advisor-ai-prod</code> emitting <code>gen_ai.*</code> pinned to semantic conventions v1.30.0; prompt and RAG payload allowlist in review with counsel, three of eleven fields still open.", "org": "Sparq", "role": "platform engineer", "side": "sparq", "st": "progress"}};
+    var ST_LABEL = { done: "Done", progress: "In progress", blocked: "Blocked", none: "Not started" };
+    var MODE_KEY = "gcp_worm_view_mode";
+    var app = document.getElementById("app");
+    var radios = Array.prototype.slice.call(document.querySelectorAll("input[name=viewmode]"));
+    var mode = "blank";
+    var own = {};
+
+    function snapshotOwn() {
+      var o = {};
+      boxes.forEach(function (cb) { o[cb.id] = cb.checked; });
+      return o;
+    }
+
+    function buildDemo() {
+      boxes.forEach(function (cb) {
+        var d = DEMO[cb.id];
+        if (!d) return;
+        var li = cb.parentNode;
+        var wrap = document.createElement("div");
+        wrap.className = "t-demo";
+        wrap.hidden = true;
+        wrap.setAttribute("data-st", d.st);
+        var ev = d.ev ? '<p class="t-ev"><span class="k">Evidence</span>' + d.ev + "</p>" : "";
+        wrap.innerHTML = '<p class="t-meta"><span class="st">' + ST_LABEL[d.st] + "</span>" +
+          '<span class="own" data-side="' + d.side + '"><span class="org">' + d.org + "</span>" + d.role + "</span>" +
+          '<span class="when">' + d.date + "</span></p>" + ev;
+        li.appendChild(wrap);
+      });
+      var tally = { done: 0, progress: 0, blocked: 0, none: 0 };
+      boxes.forEach(function (cb) { var d = DEMO[cb.id]; if (d) tally[d.st]++; });
+      document.getElementById("st-ledger").innerHTML =
+        ["done", "progress", "blocked", "none"].map(function (k) {
+          return '<span data-st="' + k + '"><i aria-hidden="true"></i><b>' + tally[k] + "</b> " +
+            ST_LABEL[k].toLowerCase() + "</span>";
+        }).join("");
+    }
+
+    function setMode(next, announce) {
+      next = next === "demo" ? "demo" : "blank";
+      if (next === "demo") {
+        if (mode !== "demo") own = snapshotOwn();
+        boxes.forEach(function (cb) {
+          var d = DEMO[cb.id];
+          cb.checked = !!(d && d.st === "done");
+          cb.disabled = true;
+        });
+      } else {
+        boxes.forEach(function (cb) {
+          cb.disabled = false;
+          cb.checked = !!own[cb.id];
+        });
+      }
+      mode = next;
+      app.setAttribute("data-mode", mode);
+      var showDemo = mode === "demo";
+      document.getElementById("demo-bar").hidden = !showDemo;
+      document.getElementById("demo-intro").hidden = !showDemo;
+      document.getElementById("st-ledger").hidden = !showDemo;
+      document.getElementById("demo-split").hidden = !showDemo;
+      document.getElementById("reset-wrap").hidden = showDemo;
+      document.getElementById("ro-note").hidden = !showDemo;
+      Array.prototype.forEach.call(document.querySelectorAll(".t-demo"), function (el) { el.hidden = !showDemo; });
+      radios.forEach(function (r) { r.checked = (r.value === mode); });
+      if (armed) disarm();
+      var ls = store();
+      if (ls) { try { ls.setItem(MODE_KEY, mode); } catch (e) {} }
+      render(false);
+      if (announce) {
+        var done = boxes.filter(function (cb) { return cb.checked; }).length;
+        live.textContent = showDemo
+          ? "Demo engagement shown: Generica Clearing Partners, illustrative and read-only. 9 of 19 controls verified, 3 in progress, 2 blocked."
+          : "Blank checklist restored, with your own progress: " + done + " of " + boxes.length + " controls verified.";
+      }
+    }
+
+    radios.forEach(function (r) {
+      r.addEventListener("change", function () { if (r.checked) setMode(r.value, true); });
+    });
+
+    load();
+    own = snapshotOwn();
+    buildDemo();
+    var savedMode = null;
+    var ls0 = store();
+    if (ls0) { try { savedMode = ls0.getItem(MODE_KEY); } catch (e) {} }
+    setMode(savedMode === "demo" ? "demo" : "blank", false);
+  })();
+</script>
+
+</body>
+</html>
